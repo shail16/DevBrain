@@ -1,0 +1,164 @@
+========================================================================
+REUSABLE CODE TO SET VALUES IN DIFFERENT TELERIK CONTROLS
+========================================================================
+This document contains reusable code snippets for setting values in 
+various Telerik controls across different environments (ASP.NET AJAX, 
+Kendo UI / jQuery, and UI Automation using Selenium C#).
+
+------------------------------------------------------------------------
+1. TELERIK ASP.NET AJAX (Client-Side JavaScript)
+------------------------------------------------------------------------
+Telerik ASP.NET AJAX controls expose a rich client-side API. Always use 
+the $find() method to get the client-side object of the control.
+
+// --- RadTextBox ---
+function setRadTextBoxValue(clientId, newValue) {
+    var textBox = $find(clientId);
+    if (textBox) {
+        textBox.set_value(newValue);
+    }
+}
+
+// --- RadComboBox ---
+function setRadComboBoxByText(clientId, textToSelect) {
+    var comboBox = $find(clientId);
+    if (comboBox) {
+        var item = comboBox.findItemByText(textToSelect);
+        if (item) {
+            item.select();
+        }
+    }
+}
+
+function setRadComboBoxByValue(clientId, valueToSelect) {
+    var comboBox = $find(clientId);
+    if (comboBox) {
+        var item = comboBox.findItemByValue(valueToSelect);
+        if (item) {
+            item.select();
+        }
+    }
+}
+
+// --- RadDatePicker ---
+function setRadDatePickerValue(clientId, dateObject) {
+    var datePicker = $find(clientId);
+    if (datePicker) {
+        // e.g., dateObject = new Date(2026, 7, 27)
+        datePicker.set_selectedDate(dateObject); 
+    }
+}
+
+// --- RadNumericTextBox ---
+function setRadNumericValue(clientId, numericValue) {
+    var numericBox = $find(clientId);
+    if (numericBox) {
+        numericBox.set_value(numericValue);
+    }
+}
+
+// --- RadCheckBox ---
+function setRadCheckBoxState(clientId, isChecked) {
+    var checkBox = $find(clientId);
+    if (checkBox) {
+        checkBox.set_checked(isChecked);
+    }
+}
+
+
+------------------------------------------------------------------------
+2. KENDO UI (jQuery / JavaScript)
+------------------------------------------------------------------------
+For Telerik's Kendo UI framework, you interact with the jQuery data 
+object attached to the element.
+
+// --- Kendo DropDownList ---
+function setKendoDropDownListValue(elementId, value) {
+    var dropdown = $("#" + elementId).data("kendoDropDownList");
+    if (dropdown) {
+        dropdown.value(value);
+        dropdown.trigger("change"); // Trigger change event if needed
+    }
+}
+
+// --- Kendo DatePicker ---
+function setKendoDatePickerValue(elementId, dateObject) {
+    var datepicker = $("#" + elementId).data("kendoDatePicker");
+    if (datepicker) {
+        datepicker.value(dateObject);
+        datepicker.trigger("change");
+    }
+}
+
+// --- Kendo NumericTextBox ---
+function setKendoNumericTextBoxValue(elementId, number) {
+    var numericTextBox = $("#" + elementId).data("kendoNumericTextBox");
+    if (numericTextBox) {
+        numericTextBox.value(number);
+        numericTextBox.trigger("change");
+    }
+}
+
+// --- Kendo ComboBox ---
+function setKendoComboBoxValue(elementId, value) {
+    var combobox = $("#" + elementId).data("kendoComboBox");
+    if (combobox) {
+        combobox.value(value);
+        combobox.trigger("change");
+    }
+}
+
+
+------------------------------------------------------------------------
+3. SELENIUM WEBDRIVER (C# Automation)
+------------------------------------------------------------------------
+When automating Telerik controls via Selenium, standard sendKeys often 
+doesn't work well due to the complex DOM structure. The best approach 
+is executing JavaScript via IJavaScriptExecutor.
+
+using OpenQA.Selenium;
+using System;
+
+public class TelerikHelpers
+{
+    private IWebDriver _driver;
+    private IJavaScriptExecutor _js;
+
+    public TelerikHelpers(IWebDriver driver)
+    {
+        _driver = driver;
+        _js = (IJavaScriptExecutor)_driver;
+    }
+
+    // Set value for RadTextBox (ASP.NET AJAX)
+    public void SetRadTextBox(string clientId, string value)
+    {
+        string script = $@"
+            var control = $find('{clientId}');
+            if(control) {{ control.set_value('{value}'); }}";
+        _js.ExecuteScript(script);
+    }
+
+    // Set value for Kendo DropDownList
+    public void SetKendoDropdown(string elementId, string value)
+    {
+        string script = $@"
+            var ddl = $('#{elementId}').data('kendoDropDownList');
+            if(ddl) {{ 
+                ddl.value('{value}'); 
+                ddl.trigger('change');
+            }}";
+        _js.ExecuteScript(script);
+    }
+    
+    // Standard WebDriver approach for Kendo input (if JS is not preferred)
+    // Note: This requires clicking the visible input, then sending keys
+    public void SetKendoInputByKeystrokes(By locator, string value)
+    {
+        var element = _driver.FindElement(locator);
+        element.Clear();
+        element.SendKeys(value);
+        element.SendKeys(Keys.Enter);
+    }
+}
+========================================================================

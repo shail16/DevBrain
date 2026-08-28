@@ -1,0 +1,26 @@
+# DevBrain dependencies — exact pins, verified together on Python 3.13.
+# Install with:  pip install -r requirements.txt
+
+# --- Web API ---
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-dotenv==1.2.3
+
+# --- LangChain core + integrations ---
+langchain-core==1.6.1
+langchain-text-splitters==1.1.2
+langchain-openai==1.6.0          # LLM: answer generation
+langchain-cohere==0.6.0          # Embeddings: text -> vectors
+langchain-postgres==0.0.17       # Vector store: pgvector-backed
+
+# --- Observability ---
+langsmith==0.11.1
+
+# --- PostgreSQL driver (binary wheel: no compiler needed) + SQL toolkit ---
+psycopg[binary]==3.3.4
+SQLAlchemy==2.0.52               # used directly by db.py for health/stats queries
+
+# --- Document parsing ---
+pypdf==6.16.2                    # .pdf
+docx2txt==0.9                    # .docx
+openpyxl==3.1.5                  # .xlsx

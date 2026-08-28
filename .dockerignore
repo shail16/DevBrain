@@ -1,0 +1,46 @@
+# Everything listed here is excluded from the build context.
+# This keeps the image small AND keeps secrets out of it.
+
+# ---- Secrets: never bake these into an image ----
+# Configuration is injected at RUNTIME via env_file / environment variables.
+# An image containing .env can leak every key the moment it is pushed anywhere.
+.env
+.env.local
+*.pem
+
+# ---- Virtualenvs: the image builds its own ----
+.venv/
+venv/
+env/
+
+# ---- Python noise ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# ---- Git and editors ----
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# ---- Docs: not needed at runtime ----
+*.md
+!requirements.txt
+
+# ---- Docker's own files ----
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# ---- Your documents ----
+# Mounted as a volume at runtime rather than copied in, so you can add notes
+# without rebuilding the image.
+data/
+
+# ---- Runtime junk ----
+*.log
+pgadmin/

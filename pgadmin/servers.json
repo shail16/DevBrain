@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "DevBrain Postgres",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "devbrain",
+      "Username": "devbrain",
+      "SSLMode": "prefer",
+      "Comment": "DevBrain vector store. Password: devbrain_pass"
+    }
+  }
+}

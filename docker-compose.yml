@@ -1,0 +1,127 @@
+# DevBrain — local infrastructure
+#
+# Brings up two containers:
+#   1. postgres  -> PostgreSQL 17 with the pgvector extension (our vector database)
+#   2. pgadmin   -> Web UI to browse that database
+#
+# Start with:  docker compose up -d
+# Stop with:   docker compose down          (keeps your data)
+# Wipe with:   docker compose down -v       (deletes your data)
+#
+# PORTS
+# -----
+# DevBrain deliberately uses 5433 and 5051 rather than the usual 5432 and 5050,
+# so it can run alongside any other Postgres/pgAdmin you already have going.
+# Docker Compose reads the same .env file the Python code does, so you can
+# override them there:
+#
+#     POSTGRES_HOST_PORT=5432
+#     PGADMIN_HOST_PORT=5050
+#
+# If you change POSTGRES_HOST_PORT, change the port in DATABASE_URL to match.
+
+services:
+  postgres:
+    # This image is plain PostgreSQL with the `pgvector` extension pre-compiled.
+    # A normal `postgres:17` image would NOT be able to store embeddings.
+    image: pgvector/pgvector:pg17
+    container_name: devbrain-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: devbrain
+      POSTGRES_PASSWORD: devbrain_pass
+      POSTGRES_DB: devbrain
+      # Keeps text comparisons predictable across host machines.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      # host:container — your Python code connects to localhost:5433 by default.
+      # Only the host side (left) changes; inside the Docker network it stays 5432.
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      # Named volume so your embeddings survive `docker compose down`.
+      - devbrain_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # pgAdmin waits for this to pass before starting.
+      test: ["CMD-SHELL", "pg_isready -U devbrain -d devbrain"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: devbrain-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@devbrain.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      # Desktop mode: skips the login screen and the master-password prompt.
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      # Open http://localhost:5051 in your browser.
+      - "${PGADMIN_HOST_PORT:-5051}:80"
+    volumes:
+      - devbrain_pgadmin:/var/lib/pgadmin
+      # Pre-registers the DevBrain server so you don't have to add it by hand.
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  #  The DevBrain application itself.
+  #
+  #  This service sits behind the "full" profile, so it is SKIPPED by a plain
+  #  `docker compose up -d`. That keeps the default developer workflow — run
+  #  Postgres in Docker, run Python on your host with hot reload — completely
+  #  unchanged.
+  #
+  #      docker compose up -d                    -> database only (development)
+  #      docker compose --profile full up -d     -> database + containerised app
+  # ---------------------------------------------------------------------------
+  app:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: devbrain-app:latest
+    container_name: devbrain-app
+    restart: unless-stopped
+
+    # Load every setting from your .env. Nothing is baked into the image.
+    env_file:
+      - .env
+
+    environment:
+      # THE most important line in this file, and the mistake everyone makes.
+      #
+      # `localhost` inside a container means THAT CONTAINER, not your machine.
+      # So the host-facing `localhost:5433` from .env cannot work here.
+      # Containers on the same Compose network reach each other by SERVICE NAME
+      # on the container's INTERNAL port:
+      #
+      #     from your host      -> localhost:5433   (the published port)
+      #     from this container -> postgres:5432    (service name, internal port)
+      #
+      # This value overrides DATABASE_URL from env_file above.
+      DATABASE_URL: postgresql+psycopg://devbrain:devbrain_pass@postgres:5432/devbrain
+      API_PORT: "8001"
+
+    ports:
+      # Host port is configurable so it cannot clash with a uvicorn you are
+      # already running on 8001 during development.
+      - "${API_HOST_PORT:-8001}:8001"
+
+    volumes:
+      # Your documents, mounted read-only. Mounting rather than copying means
+      # you can add notes and re-ingest without rebuilding the image.
+      - ./data:/app/data:ro
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  devbrain_pgdata:
+  devbrain_pgadmin:

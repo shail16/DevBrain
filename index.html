@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DevBrain — your private engineering knowledge base</title>
+<style>
+  /* ---------------------------------------------------------------------
+     Design tokens. Everything below references these, so changing the
+     accent colour or radius in one place restyles the whole page.
+     --------------------------------------------------------------------- */
+  :root {
+    --bg:            #0f1117;
+    --bg-elevated:   #171a23;
+    --bg-input:      #1d212c;
+    --border:        #262b38;
+    --border-strong: #343b4d;
+    --text:          #e6e9ef;
+    --text-muted:    #8b93a7;
+    --text-faint:    #5f6779;
+    --accent:        #6c8cff;
+    --accent-soft:   rgba(108, 140, 255, 0.12);
+    --green:         #3ecf8e;
+    --amber:         #e5a13a;
+    --red:           #f4696b;
+    --radius:        12px;
+    --radius-sm:     8px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 820px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  /* ---------------------------- header ---------------------------- */
+  header { margin-bottom: 28px; }
+
+  .brand {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 26px; font-weight: 650; letter-spacing: -0.02em;
+  }
+  .brand .logo {
+    width: 34px; height: 34px; flex: none;
+    display: grid; place-items: center;
+    background: var(--accent-soft);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    font-size: 18px;
+  }
+  .tagline { color: var(--text-muted); font-size: 14px; margin-top: 6px; }
+
+  /* ---------------------------- status bar ---------------------------- */
+  .status {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-top: 18px; padding: 10px 14px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px; color: var(--text-muted);
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%; flex: none;
+    background: var(--text-faint);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.03);
+  }
+  .dot.ok    { background: var(--green); }
+  .dot.warn  { background: var(--amber); }
+  .dot.err   { background: var(--red); }
+  .dot.load  { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  .status .sep { color: var(--border-strong); }
+  .status code { font-family: var(--mono); font-size: 12px; color: var(--text); }
+
+  /* ---------------------------- search box ---------------------------- */
+  form { margin-top: 22px; }
+
+  .field {
+    display: flex; gap: 10px; align-items: flex-end;
+    background: var(--bg-input);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 10px 10px 10px 16px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  textarea {
+    flex: 1; border: 0; outline: 0; resize: none;
+    background: transparent; color: var(--text);
+    font-family: var(--sans); font-size: 15px; line-height: 1.6;
+    padding: 6px 0; max-height: 200px;
+  }
+  textarea::placeholder { color: var(--text-faint); }
+
+  button {
+    flex: none; border: 0; cursor: pointer;
+    background: var(--accent); color: #0b0d13;
+    font-family: var(--sans); font-size: 14px; font-weight: 600;
+    padding: 10px 18px; border-radius: var(--radius-sm);
+    transition: filter 0.15s, opacity 0.15s;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.1); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .hint {
+    margin-top: 8px; font-size: 12px; color: var(--text-faint);
+    display: flex; justify-content: space-between; gap: 12px;
+  }
+  kbd {
+    font-family: var(--mono); font-size: 11px;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px;
+  }
+
+  /* ---------------------------- examples ---------------------------- */
+  .examples { margin-top: 18px; }
+  .examples-label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-faint); margin-bottom: 10px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    color: var(--text-muted); border-radius: 999px;
+    padding: 6px 14px; font-size: 13px; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .chip:hover { color: var(--text); border-color: var(--border-strong); }
+
+  /* ---------------------------- result ---------------------------- */
+  .result { margin-top: 28px; }
+
+  .card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+  }
+  .card.error { border-color: rgba(244,105,107,0.4); background: rgba(244,105,107,0.06); }
+
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+    margin: -4px 0 16px;
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-faint);
+  }
+  .meta { display: flex; gap: 10px; align-items: center; text-transform: none; letter-spacing: 0; }
+  .meta span { white-space: nowrap; }
+
+  /* Answer body: markdown-ish rendering */
+  .answer > *:first-child { margin-top: 0; }
+  .answer > *:last-child  { margin-bottom: 0; }
+  .answer p  { margin: 0 0 12px; }
+  .answer ul { margin: 0 0 12px; padding-left: 22px; }
+  .answer li { margin-bottom: 5px; }
+  .answer h3 { font-size: 15px; margin: 18px 0 8px; }
+  .answer code {
+    font-family: var(--mono); font-size: 13px;
+    background: rgba(255,255,255,0.06); padding: 1.5px 5px; border-radius: 4px;
+  }
+  .answer pre {
+    background: #0b0d13; border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px; overflow-x: auto; margin: 0 0 14px;
+  }
+  .answer pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+  .answer .cite {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--accent); background: var(--accent-soft);
+    padding: 1px 6px; border-radius: 4px; white-space: nowrap;
+  }
+
+  /* Sources */
+  .sources { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+  .sources-label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-faint); margin-bottom: 12px;
+  }
+  .source {
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 11px 14px; margin-bottom: 8px; background: rgba(255,255,255,0.015);
+  }
+  .source-name {
+    font-family: var(--mono); font-size: 13px; color: var(--text);
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  }
+  .badge {
+    font-family: var(--sans); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--text-faint);
+    border: 1px solid var(--border-strong); border-radius: 4px; padding: 1px 5px;
+  }
+  .source-snippet {
+    margin-top: 7px; font-size: 13px; color: var(--text-muted); line-height: 1.5;
+  }
+
+  /* Skeleton loader */
+  .skeleton-line {
+    height: 12px; border-radius: 6px; margin-bottom: 10px;
+    background: linear-gradient(90deg, var(--bg-input) 25%, var(--border) 50%, var(--bg-input) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  footer {
+    margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text-faint);
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  footer a { color: var(--text-muted); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand"><span class="logo" aria-hidden="true">◆</span> DevBrain</div>
+    <div class="tagline">
+      Ask questions about your own notes, docs and code snippets. Answers come
+      only from the documents you ingested — never from the model's general knowledge.
+    </div>
+
+    <div class="status" id="status" role="status" aria-live="polite">
+      <span class="dot load" id="status-dot"></span>
+      <span id="status-text">Checking backend…</span>
+    </div>
+  </header>
+
+  <form id="ask-form">
+    <label class="sr-only" for="question">Your question</label>
+    <div class="field">
+      <textarea id="question" rows="1"
+        placeholder="e.g. What's our standard approach to database migrations?"
+        autocomplete="off" autofocus></textarea>
+      <button type="submit" id="submit-btn">Ask</button>
+    </div>
+    <div class="hint">
+      <span><kbd>Enter</kbd> to send &nbsp;·&nbsp; <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</span>
+      <span id="char-count"></span>
+    </div>
+  </form>
+
+  <div class="examples" id="examples" hidden>
+    <div class="examples-label">Try one of these</div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="result" id="result" aria-live="polite"></div>
+
+  <footer id="footer"></footer>
+</div>
+
+<script>
+/* =======================================================================
+   DevBrain frontend
+   -----------------------------------------------------------------------
+   Deliberately dependency-free: no build step, no framework, no CDN. Three
+   responsibilities only:
+
+     1. poll  GET  /api/health  -> show whether the stack is ready
+     2. POST      /api/ask      -> send the question, render the answer
+     3. render the answer safely (escape first, THEN add markdown formatting)
+
+   Because the page is served by FastAPI itself, API_BASE can stay empty and
+   requests go to the same origin. If you open this file directly from disk
+   (file://) it falls back to localhost:8000, which works thanks to the CORS
+   middleware in app.py.
+   ======================================================================= */
+
+const API_BASE = location.protocol === "file:" ? "http://localhost:8001" : "";
+
+const els = {
+  form:      document.getElementById("ask-form"),
+  question:  document.getElementById("question"),
+  submit:    document.getElementById("submit-btn"),
+  result:    document.getElementById("result"),
+  statusDot: document.getElementById("status-dot"),
+  statusText:document.getElementById("status-text"),
+  charCount: document.getElementById("char-count"),
+  examples:  document.getElementById("examples"),
+  chips:     document.getElementById("chips"),
+  footer:    document.getElementById("footer"),
+};
+
+let busy = false;
+
+/* ------------------------------ utilities ------------------------------ */
+
+/** Escape HTML. Called on every piece of server data BEFORE any markup is
+ *  added, so a document containing `<script>` can never execute. */
+function esc(str) {
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+/**
+ * Minimal, safe markdown renderer for the answer text.
+ *
+ * Order matters: we escape the whole string first, then pull out fenced code
+ * blocks into placeholders (so their contents are never treated as markdown),
+ * then format the prose, then put the code blocks back.
+ */
+function renderMarkdown(raw) {
+  let text = esc(raw);
+
+  // 1. Fenced code blocks -> placeholders, each isolated on its own line so
+  //    the block-structure pass below always sees it as a standalone token.
+  const blocks = [];
+  text = text.replace(/```([a-zA-Z0-9+#-]*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    blocks.push(`<pre><code data-lang="${lang}">${code.replace(/\n$/, "")}</code></pre>`);
+    return `\n@BLOCK${blocks.length - 1}@\n`;
+  });
+
+  // 2. Inline formatting
+  text = text
+    .replace(/`([^`\n]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+    // Citations like [redis-notes.md] become visible source pills.
+    .replace(/\[([^\]\n]+\.(?:txt|md|markdown|log|csv|pdf|docx|xlsx|xlsm))\]/gi,
+             '<span class="cite">$1</span>');
+
+  // 3. Block structure: group consecutive bullets into a single <ul>
+  const lines = text.split("\n");
+  let html = "", listOpen = false, paragraph = [];
+
+  const flushParagraph = () => {
+    if (paragraph.length) {
+      html += `<p>${paragraph.join("<br>")}</p>`;
+      paragraph = [];
+    }
+  };
+  const closeList = () => {
+    if (listOpen) { html += "</ul>"; listOpen = false; }
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("@BLOCK")) {
+      flushParagraph(); closeList();
+      html += blocks[Number(trimmed.match(/@BLOCK(\d+)@/)[1])];
+      continue;
+    }
+    if (!trimmed) { flushParagraph(); closeList(); continue; }
+
+    const bullet = trimmed.match(/^[-*•]\s+(.*)$/) || trimmed.match(/^\d+\.\s+(.*)$/);
+    if (bullet) {
+      flushParagraph();
+      if (!listOpen) { html += "<ul>"; listOpen = true; }
+      html += `<li>${bullet[1]}</li>`;
+      continue;
+    }
+
+    const heading = trimmed.match(/^#{1,4}\s+(.*)$/);
+    if (heading) {
+      flushParagraph(); closeList();
+      html += `<h3>${heading[1]}</h3>`;
+      continue;
+    }
+
+    closeList();
+    paragraph.push(trimmed);
+  }
+  flushParagraph(); closeList();
+
+  return html;
+}
+
+/* ------------------------------ health ------------------------------ */
+
+const STATUS_STYLES = {
+  ok:                   { dot: "ok",   text: (h) => `Ready — ${h.chunks.toLocaleString()} chunks indexed` },
+  empty:                { dot: "warn", text: () => "Knowledge base is empty" },
+  degraded:             { dot: "warn", text: () => "Running with warnings" },
+  database_unreachable: { dot: "err",  text: () => "Cannot reach PostgreSQL" },
+  misconfigured:        { dot: "err",  text: () => "Backend is not configured" },
+};
+
+async function checkHealth() {
+  try {
+    const response = await fetch(`${API_BASE}/api/health`);
+    const health = await response.json();
+    const style = STATUS_STYLES[health.status] || STATUS_STYLES.degraded;
+
+    els.statusDot.className = `dot ${style.dot}`;
+
+    const parts = [`<strong>${esc(style.text(health))}</strong>`];
+    if (health.detail) parts.push(esc(health.detail));
+    if (health.status === "ok" || health.status === "empty") {
+      parts.push(
+        `<span class="sep">|</span> chat <code>${esc(health.chat_model)}</code>`,
+        `<span class="sep">|</span> embeddings <code>${esc(health.embedding_model)}</code>`,
+        `<span class="sep">|</span> LangSmith ${health.langsmith_tracing
+            ? `<code>${esc(health.langsmith_project)}</code>` : "off"}`
+      );
+    }
+    els.statusText.innerHTML = parts.join(" ");
+
+    buildExamples(health);
+    return health;
+  } catch {
+    els.statusDot.className = "dot err";
+    els.statusText.innerHTML =
+      "<strong>Backend unreachable.</strong> Start it with " +
+      "<code>uvicorn app:app --reload --port 8001</code>";
+    return null;
+  }
+}
+
+/** Turn the ingested file names into clickable example questions. */
+function buildExamples(health) {
+  const sources = (health && health.sources) || [];
+  if (!sources.length) { els.examples.hidden = true; return; }
+
+  const topics = sources.slice(0, 3).map((s) =>
+    s.source.replace(/\.[^.]+$/, "").replace(/[-_/]+/g, " ").trim()
+  );
+  const questions = [
+    ...topics.map((t) => `Summarise what the notes say about ${t}`),
+    "What best practices are documented here?",
+  ];
+
+  els.chips.innerHTML = "";
+  for (const question of questions) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip";
+    chip.textContent = question;
+    chip.addEventListener("click", () => {
+      els.question.value = question;
+      autoGrow();
+      els.form.requestSubmit();
+    });
+    els.chips.appendChild(chip);
+  }
+  els.examples.hidden = false;
+}
+
+/* ------------------------------ rendering ------------------------------ */
+
+function showSkeleton() {
+  els.result.innerHTML = `
+    <div class="card">
+      <div class="card-head"><span>Searching your documents…</span></div>
+      <div class="skeleton-line" style="width:100%"></div>
+      <div class="skeleton-line" style="width:92%"></div>
+      <div class="skeleton-line" style="width:74%"></div>
+      <div class="skeleton-line" style="width:85%"></div>
+    </div>`;
+}
+
+function showError(message) {
+  els.result.innerHTML = `
+    <div class="card error">
+      <div class="card-head"><span>Something went wrong</span></div>
+      <div class="answer">${renderMarkdown(message)}</div>
+    </div>`;
+}
+
+function showAnswer(data) {
+  const meta = [
+    `${data.chunks_retrieved} chunk${data.chunks_retrieved === 1 ? "" : "s"} used`,
+    `${data.latency_ms} ms`,
+  ];
+  if (data.langsmith_run_id) {
+    meta.push(`trace ${esc(data.langsmith_run_id.slice(0, 8))}`);
+  }
+
+  const sourcesHtml = data.sources.length
+    ? `<div class="sources">
+         <div class="sources-label">Sources</div>
+         ${data.sources.map((s) => `
+           <div class="source">
+             <div class="source-name">
+               ${esc(s.source)}
+               ${s.file_type ? `<span class="badge">${esc(s.file_type)}</span>` : ""}
+               ${s.locations.length ? `<span class="badge">${esc(s.locations.join(", "))}</span>` : ""}
+             </div>
+             ${s.snippet ? `<div class="source-snippet">${esc(s.snippet)}</div>` : ""}
+           </div>`).join("")}
+       </div>`
+    : "";
+
+  els.result.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <span>Answer</span>
+        <span class="meta">${meta.map((m) => `<span>${esc(m)}</span>`).join('<span class="sep">·</span>')}</span>
+      </div>
+      <div class="answer">${renderMarkdown(data.answer)}</div>
+      ${sourcesHtml}
+    </div>`;
+}
+
+/* ------------------------------ asking ------------------------------ */
+
+async function ask(question) {
+  busy = true;
+  els.submit.disabled = true;
+  els.submit.textContent = "Asking…";
+  showSkeleton();
+
+  try {
+    const response = await fetch(`${API_BASE}/api/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      // FastAPI reports errors as {detail: ...}; validation errors use a list.
+      let detail = payload && payload.detail;
+      if (Array.isArray(detail)) detail = detail.map((d) => d.msg).join("; ");
+      showError(detail || `Request failed with HTTP ${response.status}.`);
+      return;
+    }
+
+    showAnswer(payload);
+    checkHealth();          // refresh the chunk count in the status bar
+  } catch (error) {
+    showError(
+      "Could not reach the DevBrain API.\n\n" +
+      "- Is the server running? `uvicorn app:app --reload --port 8001`\n" +
+      "- Are the containers up? `docker compose ps`\n\n" +
+      "Browser error: `" + error.message + "`"
+    );
+  } finally {
+    busy = false;
+    els.submit.disabled = false;
+    els.submit.textContent = "Ask";
+    els.question.focus();
+  }
+}
+
+/* ------------------------------ wiring ------------------------------ */
+
+function autoGrow() {
+  els.question.style.height = "auto";
+  els.question.style.height = Math.min(els.question.scrollHeight, 200) + "px";
+  const length = els.question.value.trim().length;
+  els.charCount.textContent = length > 0 ? `${length} / 2000` : "";
+}
+
+els.question.addEventListener("input", autoGrow);
+
+// Enter submits; Shift+Enter inserts a newline.
+els.question.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    els.form.requestSubmit();
+  }
+});
+
+els.form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const question = els.question.value.trim();
+  if (busy) return;
+  if (question.length < 3) {
+    showError("Please type a question of at least 3 characters.");
+    return;
+  }
+  ask(question);
+});
+
+// Initial load, then a slow poll so the banner self-heals once you start
+// the containers or finish an ingestion run.
+checkHealth().then((health) => {
+  els.footer.innerHTML = health
+    ? `Collection <code>${esc(health.collection)}</code> · ` +
+      `<a href="${API_BASE}/docs" target="_blank" rel="noreferrer">API docs</a> · ` +
+      `<a href="http://localhost:5051" target="_blank" rel="noreferrer">pgAdmin</a>` +
+      (health.langsmith_tracing
+        ? ` · <a href="https://smith.langchain.com" target="_blank" rel="noreferrer">LangSmith traces</a>`
+        : "")
+    : `<a href="${API_BASE}/docs" target="_blank" rel="noreferrer">API docs</a>`;
+});
+setInterval(checkHealth, 15000);
+</script>
+</body>
+</html>
