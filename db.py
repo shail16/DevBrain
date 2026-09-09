@@ -116,3 +116,34 @@ def count_chunks_by_source(settings: Settings) -> list[tuple[str, int]]:
             text(_BY_SOURCE_SQL), {"name": settings.collection_name}
         ).all()
     return [(str(row[0]), int(row[1])) for row in rows]
+
+
+_DELETE_BY_SOURCE_SQL = """
+DELETE FROM langchain_pg_embedding e
+USING langchain_pg_collection c
+WHERE c.uuid = e.collection_id
+  AND c.name = :name
+  AND e.cmetadata ->> 'source' = :source
+"""
+
+
+def delete_chunks_for_source(settings: Settings, source: str) -> int:
+    """
+    Remove every chunk that came from one source document.
+
+    Used when a file is re-uploaded or replaced. Chunk IDs are derived from the
+    document's text, so an edited file produces brand-new IDs and the previous
+    chunks would otherwise linger in the collection forever, still being
+    retrieved and still answering questions from content you deleted.
+
+    Returns the number of rows removed (0 if the document was never ingested).
+    """
+    if not collection_exists(settings):
+        return 0
+    engine = get_engine(settings)
+    with engine.begin() as connection:          # begin() commits on success
+        result = connection.execute(
+            text(_DELETE_BY_SOURCE_SQL),
+            {"name": settings.collection_name, "source": source},
+        )
+        return int(result.rowcount or 0)

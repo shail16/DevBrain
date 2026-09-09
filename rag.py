@@ -187,9 +187,14 @@ def format_documents(documents: list[Document]) -> str:
             locator_parts.append(f"sheet '{metadata['sheet']}'")
         locator = f" ({', '.join(locator_parts)})" if locator_parts else ""
 
+        # Attribution travels with the chunk, so the model can say who
+        # contributed a document if the reader asks.
+        uploader = metadata.get("uploaded_by")
+        credit = f"\nUploaded by: {uploader}" if uploader else ""
+
         blocks.append(
             f"[Excerpt {index}]\n"
-            f"Source: {source}{locator}\n"
+            f"Source: {source}{locator}{credit}\n"
             f"Content:\n{document.page_content.strip()}"
         )
 
@@ -270,6 +275,10 @@ def documents_to_citations(documents: list[Document], snippet_chars: int = 320) 
                 "file_type": metadata.get("file_type", ""),
                 "locations": [],
                 "snippet": "",
+                # Who contributed this document, carried through from ingestion
+                # so the reader can see provenance alongside every answer.
+                "uploaded_by": metadata.get("uploaded_by", "") or "",
+                "uploaded_at": metadata.get("uploaded_at", "") or "",
             },
         )
 

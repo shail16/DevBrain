@@ -266,6 +266,77 @@ def store_chunks(settings: Settings, chunks: list[Document], reset: bool) -> int
     return written
 
 
+def ingest_files(
+    settings: Settings,
+    paths: list[Path],
+    extra_metadata: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """
+    Ingest a specific list of files and return a machine-readable summary.
+
+    This is the shared engine behind both entry points: the `ingest.py` CLI and
+    the web upload endpoint. Keeping one implementation means an uploaded file
+    is chunked, embedded and stored by exactly the same code as a file you drop
+    into /data by hand — there is no second, subtly-different path to maintain.
+
+    Re-uploading a file with the same name is treated as a REPLACEMENT: every
+    chunk previously derived from that source is deleted before the new content
+    is stored. Without that, editing a document would leave its old paragraphs
+    in the database answering questions forever, because deterministic chunk IDs
+    are content-derived and stale chunks simply never get overwritten.
+
+    Returns:
+        {"files": [{"source": str, "chunks": int, "error": str | None}, ...],
+         "chunks_added": int}
+    """
+    import db  # local import keeps the CLI's start-up free of SQLAlchemy
+
+    results: list[dict[str, object]] = []
+    all_chunks: list[Document] = []
+
+    for path in paths:
+        try:
+            label = path.relative_to(settings.data_dir).as_posix()
+        except ValueError:
+            label = path.name
+
+        try:
+            documents = load_document(path, source_label=label)
+            if not documents:
+                results.append({
+                    "source": label,
+                    "chunks": 0,
+                    "error": "No extractable text (a scanned/image-only PDF is the usual cause).",
+                })
+                continue
+
+            chunks = split_documents(settings, documents)
+            if not chunks:
+                results.append({"source": label, "chunks": 0, "error": "Produced no usable chunks."})
+                continue
+
+            # Stamp ownership onto every chunk. This metadata travels with the
+            # chunk into pgvector, so when it is later retrieved the API can
+            # tell the reader who contributed the source document.
+            if extra_metadata:
+                for chunk in chunks:
+                    chunk.metadata.update(extra_metadata)
+
+            # Replace, don't accumulate.
+            db.delete_chunks_for_source(settings, label)
+
+            all_chunks.extend(chunks)
+            results.append({"source": label, "chunks": len(chunks), "error": None})
+
+        except UnsupportedFileType as exc:
+            results.append({"source": label, "chunks": 0, "error": str(exc)})
+        except Exception as exc:  # noqa: BLE001 - reported per file, never aborts the batch
+            results.append({"source": label, "chunks": 0, "error": f"{type(exc).__name__}: {exc}"})
+
+    written = store_chunks(settings, all_chunks, reset=False) if all_chunks else 0
+    return {"files": results, "chunks_added": written}
+
+
 def report_stats(settings: Settings) -> None:
     """
     Print what is currently stored.

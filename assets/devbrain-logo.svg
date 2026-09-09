@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-14 -14 328 328" width="256" height="256"
+     role="img" aria-label="DevBrain">
+  <title>DevBrain</title>
+
+    <!-- LEFT: AI hemisphere -->
+    <path d="M 148,25 C 120,5 80,15 65,45 C 30,40 10,75 20,110
+             C -5,130 -5,175 25,200 C 15,240 50,270 85,265
+             C 110,290 145,280 148,255 Z"
+          fill="#7dd3fc" stroke="#3f3a34" stroke-width="12" stroke-linejoin="round"/>
+
+    <!-- RIGHT: human hemisphere -->
+    <path d="M 152,25 C 180,5 220,15 235,45 C 270,40 290,75 280,110
+             C 305,130 305,175 275,200 C 285,240 250,270 215,265
+             C 190,290 155,280 152,255 Z"
+          fill="#fdba74" stroke="#3f3a34" stroke-width="12" stroke-linejoin="round"/>
+
+    <!-- Central division -->
+    <line x1="150" y1="24" x2="150" y2="264" stroke="#3f3a34" stroke-width="12" stroke-linecap="round"/>
+
+    <!-- LEFT: circuit traces -->
+    <g stroke="#3f3a34" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="150,92 108,70"/>
+      <polyline points="108,70 58,112"/>
+      <polyline points="58,112 100,152"/>
+      <polyline points="100,152 150,150"/>
+      <polyline points="100,152 66,200"/>
+      <polyline points="66,200 112,238"/>
+      <polyline points="112,238 150,226"/>
+    </g>
+
+    <!-- LEFT: circuit nodes -->
+    <g fill="#86efac" stroke="#3f3a34" stroke-width="6">
+      <circle cx="108" cy="70"  r="13"/>
+      <circle cx="58"  cy="112" r="13"/>
+      <circle cx="100" cy="152" r="13"/>
+      <circle cx="66"  cy="200" r="13"/>
+      <circle cx="112" cy="238" r="13"/>
+    </g>
+
+    <!-- RIGHT: cortical folds -->
+    <g fill="none" stroke="#3f3a34" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 182,62 Q 206,48 212,82 Q 217,108 190,116"/>
+      <path d="M 243,72 Q 266,98 238,124"/>
+      <path d="M 180,155 Q 212,172 192,202"/>
+      <path d="M 248,165 Q 224,190 248,218"/>
+      <path d="M 192,238 Q 218,252 202,274"/>
+    </g>
+</svg>

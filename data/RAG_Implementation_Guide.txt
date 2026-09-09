@@ -1,0 +1,115 @@
+A Complete Guide to Python Code for RAG (Retrieval-Augmented Generation) Implementation
+
+Retrieval-Augmented Generation (RAG) involves two main components:
+1. A Retriever: Finds relevant information from a custom dataset.
+2. A Generator: An LLM that uses the retrieved information to answer a user's prompt.
+
+Below is a step-by-step implementation of RAG using LangChain, ChromaDB, and OpenAI.
+
+----------------------------------------------------------------------
+0. Prerequisites & Installations
+----------------------------------------------------------------------
+# pip install langchain langchain-openai chromadb sentence-transformers tiktoken
+
+import os
+from langchain_community.document_loaders import TextLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+
+os.environ["OPENAI_API_KEY"] = "your-openai-api-key"
+
+----------------------------------------------------------------------
+1. Document Loading
+----------------------------------------------------------------------
+loader = TextLoader("knowledge_base.txt")
+documents = loader.load()
+
+* Purpose: This step ingests your custom data (text files, PDFs, web pages) into the system. The loader reads the raw text so it can be processed in subsequent steps.
+
+----------------------------------------------------------------------
+2. Text Splitting (Chunking)
+----------------------------------------------------------------------
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000, 
+    chunk_overlap=200
+)
+chunks = text_splitter.split_documents(documents)
+
+* Purpose: LLMs have token limits (context windows). We cannot pass a massive book into the prompt all at once. Splitting breaks the document into smaller, manageable chunks. The 'overlap' ensures we don't lose context if a sentence is split down the middle.
+
+----------------------------------------------------------------------
+3. Embedding Model Initialization
+----------------------------------------------------------------------
+embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+* Purpose: Embeddings convert human-readable text chunks into numerical vectors (arrays of numbers). This allows the system to understand the "semantic meaning" of the text rather than just matching exact keywords.
+
+----------------------------------------------------------------------
+4. Vector Database / Store Creation
+----------------------------------------------------------------------
+vectorstore = Chroma.from_documents(
+    documents=chunks, 
+    embedding=embedding_model,
+    persist_directory="./chroma_db"
+)
+
+* Purpose: The vector store acts as a database for your embedded chunks. It stores the vectors and allows for extremely fast similarity searches (comparing the user's query vector to the document vectors).
+
+----------------------------------------------------------------------
+5. Retriever Setup
+----------------------------------------------------------------------
+retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+
+* Purpose: The retriever is the interface that fetches the most relevant documents from the vector store. Here, 'k=3' means it will return the top 3 most relevant chunks to whatever question the user asks.
+
+----------------------------------------------------------------------
+6. LLM Initialization and Prompt Setup
+----------------------------------------------------------------------
+llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+
+prompt_template = """
+Answer the question based only on the following context:
+{context}
+
+Question: {question}
+"""
+prompt = ChatPromptTemplate.from_template(prompt_template)
+
+* Purpose: 
+  - The LLM (Generator) is initialized to read the context and generate a conversational answer.
+  - The Prompt Template tells the LLM strictly to use the provided context to answer the question, preventing hallucinations.
+
+----------------------------------------------------------------------
+7. Building the RAG Chain
+----------------------------------------------------------------------
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+
+rag_chain = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+* Purpose: This ties everything together into a single pipeline (using LangChain's Expression Language - LCEL). 
+  - It takes the user's question.
+  - Passes it to the retriever to get docs.
+  - Formats those docs into a single string.
+  - Plugs the docs (context) and the question into the prompt.
+  - Sends the prompt to the LLM.
+  - Parses the LLM's output into a standard Python string.
+
+----------------------------------------------------------------------
+8. Execution / Querying
+----------------------------------------------------------------------
+user_query = "What is the main topic of the document?"
+response = rag_chain.invoke(user_query)
+print(response)
+
+* Purpose: This is the actual execution trigger. You pass in a plain English question, the entire RAG pipeline runs behind the scenes, and it prints out the context-aware answer.

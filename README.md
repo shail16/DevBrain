@@ -2,9 +2,12 @@
 
 A private, local AI knowledge base over your own engineering documents.
 
-Drop notes, runbooks, specs and spreadsheets into `data/`, run one script, and
-ask questions in a browser. Answers come **only** from your documents — with the
-source files listed underneath so you can verify them.
+Drop notes, runbooks, specs and spreadsheets into `data/` — or upload them
+straight from the browser — and ask questions. Answers come **only** from your
+documents, with the source files listed underneath so you can verify them.
+
+Uploaded files are saved to `data/` **and ingested in the same request**, so
+they are searchable immediately: no CLI step, no restart.
 
 ```
 data/*.pdf .docx .xlsx .md .txt
@@ -71,11 +74,13 @@ server deployment, HTTPS, backups and the production checklist.
 | Vector store | PostgreSQL 17 + pgvector (Docker) |
 | Database UI | pgAdmin 4 (Docker) |
 | Tracing | LangSmith |
+| Auth | bcrypt password hashing + server-side sessions |
 
 ## Files
 
 ```
-app.py          FastAPI server and RAG endpoint       (read path)
+app.py          FastAPI server, RAG + auth + admin    (read path)
+auth.py         users, sessions, document registry
 ingest.py       document ingestion CLI                (write path)
 rag.py          shared AI components and the chain
 loaders.py      pdf / docx / xlsx / txt → Documents

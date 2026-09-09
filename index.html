@@ -3,268 +3,923 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>DevBrain — your private engineering knowledge base</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-14 -14 328 328'%3E%3Cpath d='M148,25C120,5 80,15 65,45C30,40 10,75 20,110C-5,130 -5,175 25,200C15,240 50,270 85,265C110,290 145,280 148,255Z' fill='%237dd3fc' stroke='%233f3a34' stroke-width='16'/%3E%3Cpath d='M152,25C180,5 220,15 235,45C270,40 290,75 280,110C305,130 305,175 275,200C285,240 250,270 215,265C190,290 155,280 152,255Z' fill='%23fdba74' stroke='%233f3a34' stroke-width='16'/%3E%3Cline x1='150' y1='24' x2='150' y2='264' stroke='%233f3a34' stroke-width='16'/%3E%3Cg fill='%2386efac' stroke='%233f3a34' stroke-width='9'%3E%3Ccircle cx='95' cy='95' r='22'/%3E%3Ccircle cx='85' cy='200' r='22'/%3E%3C/g%3E%3C/svg%3E" />
+<title>DevBrain — Interactive Knowledge Base</title>
 <style>
-  /* ---------------------------------------------------------------------
-     Design tokens. Everything below references these, so changing the
-     accent colour or radius in one place restyles the whole page.
-     --------------------------------------------------------------------- */
+  /* =====================================================================
+     DevBrain — light theme
+     Same glass layout and left sidebar as before, recoloured to a soft
+     pastel scheme: sky blue as the primary accent, with light green,
+     orange, red and brown carrying meaning (success, warning, error and
+     warm neutral respectively).
+     ===================================================================== */
   :root {
-    --bg:            #0f1117;
-    --bg-elevated:   #171a23;
-    --bg-input:      #1d212c;
-    --border:        #262b38;
-    --border-strong: #343b4d;
-    --text:          #e6e9ef;
-    --text-muted:    #8b93a7;
-    --text-faint:    #5f6779;
-    --accent:        #6c8cff;
-    --accent-soft:   rgba(108, 140, 255, 0.12);
-    --green:         #3ecf8e;
-    --amber:         #e5a13a;
-    --red:           #f4696b;
-    --radius:        12px;
-    --radius-sm:     8px;
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+    /* --- canvas & surfaces (warm off-white, so the browns sit naturally) --- */
+    --bg-color:            #fbf9f6;
+    --panel-bg:            rgba(255, 255, 255, 0.72);
+    --panel-bg-solid:      #ffffff;
+    --panel-border:        rgba(146, 132, 118, 0.16);
+    --panel-border-strong: rgba(146, 132, 118, 0.30);
+    --inset-bg:            #f6f8fb;
+    --tint:                #f1f5f9;
+
+    /* --- text (all AA on the surfaces above) --- */
+    --text-main:   #33302c;
+    --text-muted:  #6f6a63;
+    --text-faint:  #9a938a;
+
+    /* --- sky blue: the primary accent --- */
+    --sky-pale:   #e0f2fe;
+    --sky-light:  #7dd3fc;
+    --sky:        #38bdf8;
+    --sky-deep:   #0284c7;
+
+    /* --- light green: success / ready --- */
+    --green-pale: #dcfce7;
+    --green-light:#86efac;
+    --green:      #22c55e;
+    --green-deep: #15803d;
+
+    /* --- light orange: warnings --- */
+    --orange-pale:  #ffedd5;
+    --orange-light: #fdba74;
+    --orange:       #f59e0b;
+    --orange-deep:  #b45309;
+
+    /* --- light red: errors / destructive --- */
+    --red-pale:  #fee2e2;
+    --red-light: #fca5a5;
+    --red:       #ef4444;
+    --red-deep:  #b91c1c;
+
+    /* --- light brown: warm neutral, code, admin badge --- */
+    --brown-pale:  #f5ece2;
+    --brown-light: #d6bfa8;
+    --brown:       #b98a5a;
+    --brown-deep:  #8d6544;
+
+    --accent-grad: linear-gradient(135deg, var(--sky-light), var(--sky-deep));
+    /* Signature rail using every colour in the palette. */
+    --rainbow-grad: linear-gradient(90deg, #7dd3fc, #86efac, #fdba74, #d6bfa8);
+
+    --radius:    12px;
+    --radius-sm: 8px;
+
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Code", Menlo, Consolas, monospace;
   }
 
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    font-size: 15px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
+    font-family: var(--font-family);
+    background-color: var(--bg-color);
+    /* Soft sky/green washes plus the knowledge-graph texture, retinted for light. */
+    background-image:
+      radial-gradient(circle at 20% 40%, rgba(56, 189, 248, 0.14) 0%, transparent 42%),
+      radial-gradient(circle at 80% 60%, rgba(134, 239, 172, 0.16) 0%, transparent 42%),
+      radial-gradient(circle at 60% 10%, rgba(253, 186, 116, 0.10) 0%, transparent 38%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' viewBox='0 0 600 600'%3E%3Cg stroke='rgba(120,113,108,0.10)' stroke-width='1.5'%3E%3Cline x1='150' y1='100' x2='350' y2='150'/%3E%3Cline x1='350' y1='150' x2='450' y2='300'/%3E%3Cline x1='450' y1='300' x2='250' y2='400'/%3E%3Cline x1='250' y1='400' x2='100' y2='250'/%3E%3Cline x1='100' y1='250' x2='150' y2='100'/%3E%3Cline x1='100' y1='250' x2='350' y2='150'/%3E%3Cline x1='250' y1='400' x2='50' y2='500'/%3E%3Cline x1='450' y1='300' x2='550' y2='100'/%3E%3C/g%3E%3Cg fill='rgba(56,189,248,0.28)'%3E%3Ccircle cx='150' cy='100' r='4'/%3E%3Ccircle cx='350' cy='150' r='3'/%3E%3Ccircle cx='450' cy='300' r='5'/%3E%3Ccircle cx='250' cy='400' r='3'/%3E%3Ccircle cx='100' cy='250' r='4'/%3E%3Ccircle cx='50' cy='500' r='2'/%3E%3Ccircle cx='550' cy='100' r='3'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 100% 100%, 100% 100%, 100% 100%, 600px 600px;
+    background-position: center, center, center, top center;
+    background-attachment: fixed;
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 40px 20px;
+    line-height: 1.55;
   }
 
-  .wrap { max-width: 820px; margin: 0 auto; padding: 40px 20px 80px; }
+  ::selection { background: rgba(56, 189, 248, .28); color: var(--text-main); }
 
-  /* ---------------------------- header ---------------------------- */
-  header { margin-bottom: 28px; }
-
-  .brand {
-    display: flex; align-items: center; gap: 12px;
-    font-size: 26px; font-weight: 650; letter-spacing: -0.02em;
+  * { scrollbar-width: thin; scrollbar-color: var(--brown-light) transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--brown-light); border-radius: 8px;
+    border: 2px solid transparent; background-clip: content-box;
   }
-  .brand .logo {
-    width: 34px; height: 34px; flex: none;
-    display: grid; place-items: center;
-    background: var(--accent-soft);
-    border: 1px solid var(--border-strong);
-    border-radius: 10px;
-    font-size: 18px;
+  ::-webkit-scrollbar-thumb:hover { background: var(--brown); background-clip: content-box; }
+
+  .container {
+    max-width: 1000px; width: 100%;
+    display: flex; flex-direction: column; gap: 24px;
+    position: relative; z-index: 10;
   }
-  .tagline { color: var(--text-muted); font-size: 14px; margin-top: 6px; }
+  .container[hidden] { display: none; }
 
-  /* ---------------------------- status bar ---------------------------- */
-  .status {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    margin-top: 18px; padding: 10px 14px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 13px; color: var(--text-muted);
-  }
-  .dot {
-    width: 8px; height: 8px; border-radius: 50%; flex: none;
-    background: var(--text-faint);
-    box-shadow: 0 0 0 3px rgba(255,255,255,0.03);
-  }
-  .dot.ok    { background: var(--green); }
-  .dot.warn  { background: var(--amber); }
-  .dot.err   { background: var(--red); }
-  .dot.load  { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
-
-  .status .sep { color: var(--border-strong); }
-  .status code { font-family: var(--mono); font-size: 12px; color: var(--text); }
-
-  /* ---------------------------- search box ---------------------------- */
-  form { margin-top: 22px; }
-
-  .field {
-    display: flex; gap: 10px; align-items: flex-end;
-    background: var(--bg-input);
-    border: 1px solid var(--border-strong);
+  .glass-panel {
+    background: var(--panel-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--panel-border);
     border-radius: var(--radius);
-    padding: 10px 10px 10px 16px;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .field:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-soft);
+    box-shadow: 0 1px 2px rgba(80, 70, 60, .04), 0 10px 30px -12px rgba(80, 70, 60, .16);
   }
 
-  textarea {
-    flex: 1; border: 0; outline: 0; resize: none;
-    background: transparent; color: var(--text);
-    font-family: var(--sans); font-size: 15px; line-height: 1.6;
-    padding: 6px 0; max-height: 200px;
-  }
-  textarea::placeholder { color: var(--text-faint); }
-
-  button {
-    flex: none; border: 0; cursor: pointer;
-    background: var(--accent); color: #0b0d13;
-    font-family: var(--sans); font-size: 14px; font-weight: 600;
-    padding: 10px 18px; border-radius: var(--radius-sm);
-    transition: filter 0.15s, opacity 0.15s;
-  }
-  button:hover:not(:disabled) { filter: brightness(1.1); }
-  button:disabled { opacity: 0.45; cursor: not-allowed; }
-
-  .hint {
-    margin-top: 8px; font-size: 12px; color: var(--text-faint);
-    display: flex; justify-content: space-between; gap: 12px;
-  }
-  kbd {
-    font-family: var(--mono); font-size: 11px;
-    background: var(--bg-elevated); border: 1px solid var(--border);
-    border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px;
+  /* ============================ header ============================ */
+  .header-top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 20px; flex-wrap: wrap;
   }
 
-  /* ---------------------------- examples ---------------------------- */
-  .examples { margin-top: 18px; }
-  .examples-label {
-    font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--text-faint); margin-bottom: 10px;
-  }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chip {
-    background: var(--bg-elevated); border: 1px solid var(--border);
-    color: var(--text-muted); border-radius: 999px;
-    padding: 6px 14px; font-size: 13px; cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
-  }
-  .chip:hover { color: var(--text); border-color: var(--border-strong); }
+  .brand-section { display: flex; flex-direction: column; gap: 12px; max-width: 600px; }
+  .logo-container { display: flex; align-items: center; gap: 16px; }
 
-  /* ---------------------------- result ---------------------------- */
-  .result { margin-top: 28px; }
+  /* The brain mark carries its own outline and colour, so it needs no tile
+     behind it. A soft drop-shadow lifts it off the frosted panel. */
+  .logo-icon {
+    width: 52px; height: 52px;
+    display: block; flex-shrink: 0; overflow: visible;
+    filter: drop-shadow(0 3px 6px rgba(80, 70, 60, .22));
+  }
+
+  .logo-container { gap: 14px; }
+  .brand-title { font-size: 32px; font-weight: 600; letter-spacing: -0.5px; color: #26241f; }
+  .brand-subtitle { color: var(--text-muted); font-size: 15px; line-height: 1.5; }
+
+  .user-card { display: flex; align-items: center; gap: 16px; padding: 12px 20px; }
+
+  .avatar {
+    width: 40px; height: 40px;
+    background: var(--sky-pale);
+    border-radius: 50%;
+    display: flex; justify-content: center; align-items: center;
+    border: 2px solid var(--sky-light);
+    flex-shrink: 0;
+  }
+  .avatar svg { width: 24px; height: 24px; fill: var(--sky-deep); }
+
+  .user-info { display: flex; flex-direction: column; gap: 4px; }
+  .user-name { font-weight: 500; font-size: 15px; white-space: nowrap; color: var(--text-main); }
+  .user-name .lead { color: var(--text-muted); font-weight: 400; }
+
+  /* Admin badge uses the warm brown, so it reads as a distinct role marker
+     rather than another blue element. */
+  .admin-badge {
+    background: linear-gradient(90deg, var(--brown), var(--brown-deep));
+    color: #fff; font-size: 10px; font-weight: 700;
+    padding: 2px 8px; border-radius: 10px;
+    width: fit-content; letter-spacing: 0.5px;
+  }
+  .admin-badge[hidden] { display: none; }
+
+  .sign-out {
+    background: none; border: 0; padding: 0;
+    color: var(--text-muted); font-family: inherit; font-size: 14px;
+    margin-left: 12px; cursor: pointer; transition: color 0.2s;
+  }
+  .sign-out:hover { color: var(--sky-deep); text-decoration: underline; }
+
+  /* ============================ status bar ============================ */
+  .status-bar {
+    display: flex; align-items: center; flex-wrap: wrap;
+    gap: 16px; padding: 12px 20px; font-size: 14px;
+  }
+  .status-indicator { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background-color: var(--text-faint); }
+  .dot.ok   { background-color: var(--green);  box-shadow: 0 0 0 3px var(--green-pale); }
+  .dot.warn { background-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-pale); }
+  .dot.err  { background-color: var(--red);    box-shadow: 0 0 0 3px var(--red-pale); }
+  .dot.load { background-color: var(--sky);    box-shadow: 0 0 0 3px var(--sky-pale);
+              animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+  .status-text { color: var(--text-main); font-weight: 600; }
+  .status-detail { color: var(--text-muted); font-size: 13px; }
+
+  .tag-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .tag {
+    display: flex; align-items: center; gap: 7px;
+    background: #fff;
+    border: 1px solid var(--panel-border);
+    padding: 4px 12px; border-radius: 20px;
+    color: var(--text-muted); font-size: 13px; white-space: nowrap;
+  }
+  .tag span { color: var(--sky-deep); font-family: var(--mono); font-size: 12px; }
+
+  /* ============================ main + sidebar ============================ */
+  .main-interface { display: flex; min-height: 440px; overflow: hidden; }
+
+  .sidebar {
+    width: 220px; flex-shrink: 0; padding: 16px 0;
+    display: flex; flex-direction: column; gap: 4px;
+    border-right: 1px solid var(--panel-border);
+    background: rgba(255, 255, 255, .45);
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 20px;
+    background: none; border: 0; border-left: 3px solid transparent;
+    color: var(--text-muted);
+    font-family: inherit; font-size: 15px; text-align: left;
+    cursor: pointer; transition: all 0.2s; width: 100%;
+  }
+  .nav-item svg { width: 18px; height: 18px; fill: currentColor; flex-shrink: 0; }
+  .nav-item:hover { background: rgba(56, 189, 248, .07); color: var(--text-main); }
+  .nav-item.is-active {
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.16) 0%, transparent 100%);
+    color: var(--sky-deep); font-weight: 600;
+    border-left-color: var(--sky-deep);
+  }
+  .nav-item.is-active svg { fill: var(--sky-deep); }
+  .nav-item[hidden] { display: none; }
+
+  .content { flex: 1; min-width: 0; padding: 32px 36px; background: rgba(255,255,255,.35); }
+
+  .panel { display: flex; flex-direction: column; min-height: 376px; }
+  .panel[hidden] { display: none; }
+
+  /* ============================ ask panel ============================
+     The composer sits ABOVE the answer: you type at the top and the result
+     appears underneath, reading top-to-bottom like a document. */
+  .ask-composer { margin-bottom: 22px; }
+
+  .input-wrapper {
+    background: #fff;
+    border: 1px solid var(--panel-border-strong);
+    border-radius: 12px;
+    display: flex; align-items: flex-end;
+    padding: 8px 8px 8px 20px; gap: 12px;
+    box-shadow: 0 1px 2px rgba(80,70,60,.05);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .input-wrapper:focus-within {
+    border-color: var(--sky);
+    box-shadow: 0 0 0 3px var(--sky-pale);
+  }
+
+  textarea#question {
+    flex: 1; min-width: 0;
+    background: transparent; border: none; resize: none;
+    color: var(--text-main);
+    font-size: 16px; font-family: inherit; line-height: 1.55;
+    outline: none; padding: 9px 0; max-height: 220px;
+  }
+  textarea#question::placeholder { color: var(--text-faint); }
+
+  .ask-btn, button.primary {
+    flex-shrink: 0;
+    background: var(--accent-grad);
+    color: #fff; border: none;
+    padding: 10px 24px; border-radius: 8px;
+    font-family: inherit; font-size: 15px; font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s, box-shadow .2s;
+    box-shadow: 0 3px 10px rgba(2, 132, 199, 0.26);
+    white-space: nowrap;
+  }
+  .ask-btn:hover:not(:disabled), button.primary:hover:not(:disabled) {
+    opacity: .92; box-shadow: 0 5px 16px rgba(2, 132, 199, 0.32);
+  }
+  .ask-btn:active:not(:disabled) { transform: translateY(1px); }
+  .ask-btn:disabled, button.primary:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+
+  .shortcuts {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+    margin-top: 14px; font-size: 12px; color: var(--text-faint);
+  }
+  .key {
+    background: var(--brown-pale);
+    border: 1px solid var(--brown-light);
+    padding: 4px 8px; border-radius: 4px;
+    color: var(--brown-deep); font-family: var(--mono); font-size: 11px;
+  }
+
+  /* ============================ secondary buttons ============================ */
+  button.ghost, .ghost.small {
+    background: #fff;
+    border: 1px solid var(--panel-border-strong);
+    color: var(--text-muted);
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    padding: 8px 16px; border-radius: var(--radius-sm);
+    cursor: pointer; box-shadow: none;
+    transition: color .2s, background .2s, border-color .2s;
+  }
+  button.ghost:hover:not(:disabled), .ghost.small:hover:not(:disabled) {
+    color: var(--sky-deep); background: var(--sky-pale); border-color: var(--sky-light);
+  }
+  .ghost.small { padding: 6px 13px; font-size: 12.5px; }
+
+  .link-btn {
+    background: none; border: 0; padding: 0;
+    font: inherit; color: var(--sky-deep);
+    text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+  }
+  .link-btn:hover { color: #0369a1; }
+
+  /* ============================ result cards ============================ */
+  .result { display: flex; flex-direction: column; gap: 16px; }
+  .result:empty { display: none; }
 
   .card {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
+    position: relative;
+    background: var(--panel-bg-solid);
+    border: 1px solid var(--panel-border);
     border-radius: var(--radius);
-    padding: 22px 24px;
+    padding: 22px 24px; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(80,70,60,.05), 0 12px 32px -14px rgba(80,70,60,.20);
+    animation: cardIn .35s cubic-bezier(.22,1,.36,1) both;
   }
-  .card.error { border-color: rgba(244,105,107,0.4); background: rgba(244,105,107,0.06); }
+  /* Signature rail: sky, green, orange and brown together. */
+  .card::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--rainbow-grad);
+  }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .card.error { border-color: var(--red-light); background: linear-gradient(180deg, #fff5f5, #fff 60%); }
+  .card.error::before { background: linear-gradient(90deg, var(--red-light), var(--red)); }
 
   .card-head {
     display: flex; align-items: center; justify-content: space-between;
-    gap: 12px; flex-wrap: wrap;
-    margin: -4px 0 16px;
-    font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--text-faint);
+    gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--text-faint);
   }
-  .meta { display: flex; gap: 10px; align-items: center; text-transform: none; letter-spacing: 0; }
-  .meta span { white-space: nowrap; }
+  .meta {
+    display: flex; gap: 8px; align-items: center;
+    text-transform: none; letter-spacing: 0; font-weight: 500;
+    font-family: var(--mono); font-size: 11.5px; color: var(--text-muted);
+  }
+  .meta .sep, .status .sep { color: var(--brown-light); }
 
-  /* Answer body: markdown-ish rendering */
+  .answer { font-size: 15px; line-height: 1.7; color: var(--text-main); }
   .answer > *:first-child { margin-top: 0; }
   .answer > *:last-child  { margin-bottom: 0; }
-  .answer p  { margin: 0 0 12px; }
-  .answer ul { margin: 0 0 12px; padding-left: 22px; }
-  .answer li { margin-bottom: 5px; }
-  .answer h3 { font-size: 15px; margin: 18px 0 8px; }
+  .answer p  { margin: 0 0 13px; }
+  .answer ul { margin: 0 0 13px; padding-left: 22px; }
+  .answer li { margin-bottom: 6px; }
+  .answer li::marker { color: var(--sky); }
+  .answer strong { color: #1f1d1a; font-weight: 600; }
+  .answer h3 { font-size: 15.5px; font-weight: 600; margin: 20px 0 9px; color: #1f1d1a; }
+
+  /* Inline code uses the warm brown, keeping it distinct from the blue links. */
   .answer code {
-    font-family: var(--mono); font-size: 13px;
-    background: rgba(255,255,255,0.06); padding: 1.5px 5px; border-radius: 4px;
+    font-family: var(--mono); font-size: 12.8px;
+    color: var(--brown-deep); background: var(--brown-pale);
+    border: 1px solid var(--brown-light);
+    padding: 1.5px 6px; border-radius: 5px;
   }
   .answer pre {
-    background: #0b0d13; border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 14px 16px; overflow-x: auto; margin: 0 0 14px;
+    margin: 0 0 14px; padding: 15px 17px;
+    background: var(--inset-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-sm); overflow-x: auto;
   }
-  .answer pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+  .answer pre code {
+    background: none; border: 0; padding: 0;
+    font-size: 12.8px; line-height: 1.6; color: #3f4a5a;
+  }
   .answer .cite {
-    font-family: var(--mono); font-size: 12px;
-    color: var(--accent); background: var(--accent-soft);
-    padding: 1px 6px; border-radius: 4px; white-space: nowrap;
+    display: inline-block; font-family: var(--mono); font-size: 11.5px;
+    color: var(--sky-deep); background: var(--sky-pale);
+    border: 1px solid var(--sky-light);
+    padding: 1px 7px; border-radius: 5px; white-space: nowrap;
   }
 
-  /* Sources */
-  .sources { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
-  .sources-label {
-    font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--text-faint); margin-bottom: 12px;
+  .sources { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--panel-border); }
+  .sources-label, .examples-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--text-faint); margin-bottom: 12px;
   }
   .source {
-    border: 1px solid var(--border); border-radius: var(--radius-sm);
-    padding: 11px 14px; margin-bottom: 8px; background: rgba(255,255,255,0.015);
+    position: relative;
+    padding: 12px 15px 12px 17px; margin-bottom: 8px;
+    background: var(--inset-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-sm); overflow: hidden;
+    transition: background .18s, border-color .18s, transform .18s;
   }
+  .source::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: linear-gradient(180deg, var(--sky-light), var(--green-light));
+  }
+  .source:hover { background: #fff; border-color: var(--sky-light); transform: translateX(2px); }
+  .source:last-child { margin-bottom: 0; }
+
   .source-name {
-    font-family: var(--mono); font-size: 13px; color: var(--text);
     display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 12.8px; color: var(--text-main);
   }
+  .source-snippet { margin-top: 7px; font-size: 12.8px; line-height: 1.55; color: var(--text-muted); }
+
   .badge {
-    font-family: var(--sans); font-size: 10px; text-transform: uppercase;
-    letter-spacing: 0.05em; color: var(--text-faint);
-    border: 1px solid var(--border-strong); border-radius: 4px; padding: 1px 5px;
+    font-family: var(--font-family); font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-muted); background: var(--tint);
+    border: 1px solid var(--panel-border-strong);
+    border-radius: 4px; padding: 2px 6px;
   }
-  .source-snippet {
-    margin-top: 7px; font-size: 13px; color: var(--text-muted); line-height: 1.5;
+  .badge.ingested { color: var(--green-deep);  background: var(--green-pale);  border-color: var(--green-light); }
+  .badge.skipped  { color: var(--orange-deep); background: var(--orange-pale); border-color: var(--orange-light); }
+  .badge.failed   { color: var(--red-deep);    background: var(--red-pale);    border-color: var(--red-light); }
+
+  .credit {
+    font-size: 11px; font-weight: 600;
+    color: var(--green-deep); background: var(--green-pale);
+    border: 1px solid var(--green-light);
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap;
   }
 
-  /* Skeleton loader */
   .skeleton-line {
-    height: 12px; border-radius: 6px; margin-bottom: 10px;
-    background: linear-gradient(90deg, var(--bg-input) 25%, var(--border) 50%, var(--bg-input) 75%);
+    height: 11px; border-radius: 6px; margin-bottom: 11px;
+    background: linear-gradient(90deg, #eef2f7 25%, #dfe7f0 50%, #eef2f7 75%);
     background-size: 200% 100%;
     animation: shimmer 1.4s linear infinite;
   }
+  .skeleton-line:last-child { margin-bottom: 0; }
   @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-  footer {
-    margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--border);
-    font-size: 12px; color: var(--text-faint);
-    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  /* ============================ upload ============================ */
+  .panel-title { font-size: 19px; font-weight: 600; letter-spacing: -0.3px; color: #26241f; }
+  .panel-sub { margin-top: 5px; font-size: 13.5px; color: var(--text-muted); }
+  .panel-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 20px;
   }
-  footer a { color: var(--text-muted); }
+
+  .drop {
+    padding: 38px 24px; text-align: center;
+    background: var(--inset-bg);
+    border: 2px dashed var(--brown-light);
+    border-radius: var(--radius);
+    cursor: pointer; transition: border-color .2s, background .2s;
+  }
+  .drop:hover { border-color: var(--sky); background: var(--sky-pale); }
+  .drop.over  { border-color: var(--sky-deep); background: var(--sky-pale); }
+
+  .drop-icon {
+    width: 46px; height: 46px; margin: 0 auto 14px;
+    display: grid; place-items: center; border-radius: 12px;
+    background: linear-gradient(135deg, var(--sky-light), var(--sky-deep));
+    box-shadow: 0 4px 12px rgba(2,132,199,.26);
+  }
+  .drop-icon svg { width: 22px; height: 22px; fill: #fff; }
+  .drop-title { font-size: 15px; font-weight: 500; color: var(--text-main); }
+  .drop-sub { margin-top: 6px; font-size: 12.5px; color: var(--text-faint); }
+
+  .queue { margin-top: 16px; display: flex; flex-direction: column; gap: 7px; }
+  .queue[hidden] { display: none; }
+
+  .qrow {
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 12px; background: #fff;
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-sm); font-size: 13px;
+  }
+  .qrow.bad { border-color: var(--red-light); background: var(--red-pale); }
+  .qext {
+    flex: none; min-width: 42px; text-align: center;
+    font-family: var(--mono); font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: #fff; padding: 4px 6px; border-radius: 5px;
+    background: linear-gradient(135deg, var(--sky), var(--sky-deep));
+  }
+  .qrow.bad .qext { background: linear-gradient(135deg, var(--red-light), var(--red)); }
+  .qname {
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: var(--mono); font-size: 12.5px; color: var(--text-main);
+  }
+  .qsize { flex: none; font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); }
+  .qrow.bad .qsize { color: var(--red-deep); font-weight: 600; }
+  .qdel {
+    flex: none; background: none; border: 0; padding: 0;
+    width: 22px; height: 22px; line-height: 1; font-size: 17px;
+    color: var(--text-faint); border-radius: 5px; cursor: pointer;
+  }
+  .qdel:hover { color: var(--red); background: var(--red-pale); }
+
+  .purpose-row { margin-top: 18px; }
+  .purpose-row[hidden] { display: none; }
+  .purpose-row label {
+    display: block; margin-bottom: 7px;
+    font-size: 12px; font-weight: 600; color: var(--text-muted);
+  }
+  .purpose-row .req { color: var(--red); font-weight: 700; }
+  .purpose-row .opt { font-weight: 400; color: var(--text-faint); }
+  .purpose-row input {
+    width: 100%; padding: 11px 15px;
+    font-family: inherit; font-size: 14px; color: var(--text-main);
+    background: #fff; border: 1px solid var(--panel-border-strong);
+    border-radius: var(--radius-sm); outline: 0;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .purpose-row input::placeholder { color: var(--text-faint); }
+  .purpose-row input:focus { border-color: var(--sky); box-shadow: 0 0 0 3px var(--sky-pale); }
+
+  .upload-actions { margin-top: 16px; display: flex; gap: 10px; }
+  .upload-actions[hidden] { display: none; }
+
+  /* ============================ tables ============================ */
+  .atable {
+    background: #fff;
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius); overflow: hidden;
+    box-shadow: 0 1px 2px rgba(80,70,60,.04);
+  }
+  .arow {
+    display: flex; align-items: center; gap: 14px;
+    padding: 13px 16px; border-bottom: 1px solid var(--panel-border);
+    transition: background .16s;
+  }
+  .arow:last-child { border-bottom: 0; }
+  .arow:hover { background: var(--sky-pale); }
+  .arow.head {
+    background: var(--tint);
+    font-size: 10.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint);
+  }
+  .arow.head:hover { background: var(--tint); }
+
+  .acol { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .acol.main { flex: 2.2; }
+  .acol.mid  { flex: 1.3; }
+  .acol.sm   { flex: .8; }
+  .acol.act  { flex: none; width: 82px; text-align: right; }
+
+  .aname { font-weight: 600; font-size: 13.5px; color: var(--text-main);
+           display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .amono { font-family: var(--mono); font-size: 12.5px; font-weight: 500; }
+  .asub  { margin-top: 3px; font-size: 11.5px; color: var(--text-faint); }
+  .aval  { font-size: 13px; color: var(--text-muted); }
+
+  .adel {
+    background: var(--red-pale); border: 1px solid var(--red-light);
+    color: var(--red-deep);
+    padding: 6px 12px; border-radius: 7px;
+    font-family: inherit; font-size: 12.5px; font-weight: 600;
+    cursor: pointer; transition: background .18s, border-color .18s;
+  }
+  .adel:hover:not(:disabled) { background: #fecaca; border-color: var(--red); }
+  .adel:disabled { opacity: .4; cursor: not-allowed; }
+
+  .aempty { padding: 34px 18px; text-align: center; font-size: 13.5px; color: var(--text-faint); }
+
+  .anotice { margin-bottom: 14px; padding: 11px 15px; font-size: 13px;
+             border-radius: var(--radius-sm); border: 1px solid; }
+  .anotice.ok  { color: var(--green-deep); background: var(--green-pale); border-color: var(--green-light); }
+  .anotice.bad { color: var(--red-deep);   background: var(--red-pale);   border-color: var(--red-light); }
+
+  /* ============================ auth screen ============================ */
+  .auth-screen { width: 100%; display: grid; place-items: center; min-height: calc(100vh - 80px); }
+  .auth-screen[hidden] { display: none; }
+
+  .auth-card { width: 100%; max-width: 430px; padding: 34px 32px 30px; background: rgba(255,255,255,.86); }
+
+  .auth-brand { display: flex; align-items: center; gap: 14px; }
+  .auth-brand .logo-icon { width: 58px; height: 58px; }
+  .auth-brand .brand-title { font-size: 26px; }
+  .auth-tag { margin: 14px 0 22px; font-size: 13.5px; line-height: 1.55; color: var(--text-muted); }
+
+  .auth-tabs {
+    display: flex; gap: 4px; padding: 4px; margin-bottom: 22px;
+    background: var(--tint); border: 1px solid var(--panel-border);
+    border-radius: var(--radius-sm);
+  }
+  .auth-tab {
+    flex: 1; background: none; border: 0;
+    color: var(--text-muted); font-family: inherit;
+    font-size: 13px; font-weight: 600;
+    padding: 9px 12px; border-radius: 6px; cursor: pointer;
+    transition: color .2s, background .2s, box-shadow .2s;
+  }
+  .auth-tab:hover:not(.is-active) { color: var(--text-main); }
+  .auth-tab.is-active {
+    color: var(--sky-deep); background: #fff;
+    box-shadow: 0 1px 3px rgba(80,70,60,.10);
+  }
+
+  .auth-form[hidden] { display: none; }
+  .auth-form label {
+    display: block; margin-bottom: 6px;
+    font-size: 12px; font-weight: 600; color: var(--text-muted);
+  }
+  .auth-form input {
+    width: 100%; margin-bottom: 15px; padding: 11px 15px;
+    font-family: inherit; font-size: 14.5px; color: var(--text-main);
+    background: #fff; border: 1px solid var(--panel-border-strong);
+    border-radius: var(--radius-sm); outline: 0;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .auth-form input::placeholder { color: var(--text-faint); font-size: 13px; }
+  .auth-form input:focus { border-color: var(--sky); box-shadow: 0 0 0 3px var(--sky-pale); }
+  .auth-form button[type="submit"] { width: 100%; margin-top: 4px; padding: 12px; }
+
+  .auth-msg { font-size: 12.5px; line-height: 1.5; }
+  .auth-msg.error   { color: var(--red-deep);   margin-bottom: 12px; }
+  .auth-msg.success { color: var(--green-deep); margin-bottom: 12px; }
+
+  /* upload result rows reuse .source; these tint the left rail by outcome */
+  .uplist { margin-top: 0; padding-top: 0; border-top: 0; }
+  .urow.ingested::before { background: linear-gradient(180deg, var(--green-light), var(--green)); }
+  .urow.skipped::before  { background: linear-gradient(180deg, var(--orange-light), var(--orange)); }
+  .urow.failed::before   { background: linear-gradient(180deg, var(--red-light), var(--red)); }
+
+  /* example chips (section is hidden by request, styled for completeness) */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    background: #fff; border: 1px solid var(--panel-border);
+    color: var(--text-muted); border-radius: 999px; padding: 7px 15px;
+    font-family: inherit; font-size: 13px; cursor: pointer;
+    transition: color .18s, border-color .18s, background .18s;
+  }
+  .chip:hover { color: var(--sky-deep); border-color: var(--sky-light); background: var(--sky-pale); }
+
+  /* hidden by request: example chips and the collection footer */
+  .examples { display: none; }
+  footer { display: none; }
+
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+  /* ============================ responsive ============================ */
+  @media (max-width: 820px) {
+    body { padding: 24px 14px; }
+    .main-interface { flex-direction: column; }
+    .sidebar {
+      width: 100%; flex-direction: row; overflow-x: auto;
+      border-right: 0; border-bottom: 1px solid var(--panel-border);
+      padding: 8px; gap: 4px;
+    }
+    .nav-item {
+      border-left: 0; border-bottom: 3px solid transparent;
+      padding: 10px 14px; white-space: nowrap; width: auto;
+    }
+    .nav-item.is-active { border-left: 0; border-bottom-color: var(--sky-deep); }
+    .content { padding: 22px 18px; }
+    .header-top { flex-direction: column; }
+    .brand-title { font-size: 26px; }
+    .arow { flex-wrap: wrap; gap: 8px; }
+    .acol.main, .acol.mid, .acol.sm { flex: 1 1 100%; }
+    .acol.act { width: 100%; text-align: left; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <header>
-    <div class="brand"><span class="logo" aria-hidden="true">◆</span> DevBrain</div>
-    <div class="tagline">
-      Ask questions about your own notes, docs and code snippets. Answers come
-      only from the documents you ingested — never from the model's general knowledge.
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="devbrain-mark" viewBox="-14 -14 328 328">
+    <!-- LEFT: AI hemisphere -->
+    <path d="M 148,25 C 120,5 80,15 65,45 C 30,40 10,75 20,110
+             C -5,130 -5,175 25,200 C 15,240 50,270 85,265
+             C 110,290 145,280 148,255 Z"
+          fill="#7dd3fc" stroke="#3f3a34" stroke-width="12" stroke-linejoin="round"/>
+
+    <!-- RIGHT: human hemisphere -->
+    <path d="M 152,25 C 180,5 220,15 235,45 C 270,40 290,75 280,110
+             C 305,130 305,175 275,200 C 285,240 250,270 215,265
+             C 190,290 155,280 152,255 Z"
+          fill="#fdba74" stroke="#3f3a34" stroke-width="12" stroke-linejoin="round"/>
+
+    <!-- Central division -->
+    <line x1="150" y1="24" x2="150" y2="264" stroke="#3f3a34" stroke-width="12" stroke-linecap="round"/>
+
+    <!-- LEFT: circuit traces -->
+    <g stroke="#3f3a34" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="150,92 108,70"/>
+      <polyline points="108,70 58,112"/>
+      <polyline points="58,112 100,152"/>
+      <polyline points="100,152 150,150"/>
+      <polyline points="100,152 66,200"/>
+      <polyline points="66,200 112,238"/>
+      <polyline points="112,238 150,226"/>
+    </g>
+
+    <!-- LEFT: circuit nodes -->
+    <g fill="#86efac" stroke="#3f3a34" stroke-width="6">
+      <circle cx="108" cy="70"  r="13"/>
+      <circle cx="58"  cy="112" r="13"/>
+      <circle cx="100" cy="152" r="13"/>
+      <circle cx="66"  cy="200" r="13"/>
+      <circle cx="112" cy="238" r="13"/>
+    </g>
+
+    <!-- RIGHT: cortical folds -->
+    <g fill="none" stroke="#3f3a34" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 182,62 Q 206,48 212,82 Q 217,108 190,116"/>
+      <path d="M 243,72 Q 266,98 238,124"/>
+      <path d="M 180,155 Q 212,172 192,202"/>
+      <path d="M 248,165 Q 224,190 248,218"/>
+      <path d="M 192,238 Q 218,252 202,274"/>
+    </g>
+  </symbol>
+</svg>
+
+
+<!-- ===================== SIGN IN / SIGN UP ===================== -->
+<div class="auth-screen" id="auth-screen">
+  <div class="auth-card glass-panel">
+    <div class="auth-brand">
+      <svg class="logo-icon" aria-hidden="true"><use href="#devbrain-mark"/></svg>
+      <h1 class="brand-title">DevBrain</h1>
+    </div>
+    <p class="auth-tag">Turn your notes, docs and code into an interactive knowledge base. Sign in to search and contribute documents.</p>
+
+    <div class="auth-tabs" role="tablist">
+      <button type="button" class="auth-tab is-active" id="signin-tab" role="tab">Sign in</button>
+      <button type="button" class="auth-tab"           id="signup-tab" role="tab">Create account</button>
     </div>
 
-    <div class="status" id="status" role="status" aria-live="polite">
-      <span class="dot load" id="status-dot"></span>
-      <span id="status-text">Checking backend…</span>
+    <form class="auth-form" id="signin-form">
+      <label for="signin-user">Username</label>
+      <input type="text" id="signin-user" autocomplete="username" required />
+      <label for="signin-pass">Password</label>
+      <input type="password" id="signin-pass" autocomplete="current-password" required />
+      <div class="auth-msg" id="signin-msg"></div>
+      <button type="submit" class="primary" id="signin-btn">Sign in</button>
+    </form>
+
+    <form class="auth-form" id="signup-form" hidden>
+      <label for="signup-user">Username</label>
+      <input type="text" id="signup-user" autocomplete="username" required
+             placeholder="letters, digits, dot, underscore, hyphen" />
+      <label for="signup-name">Full name</label>
+      <input type="text" id="signup-name" autocomplete="name" placeholder="optional" />
+      <label for="signup-email">Email</label>
+      <input type="email" id="signup-email" autocomplete="email" placeholder="optional" />
+      <label for="signup-pass">Password</label>
+      <input type="password" id="signup-pass" autocomplete="new-password" required
+             placeholder="at least 8 characters" />
+      <div class="auth-msg" id="signup-msg"></div>
+      <button type="submit" class="primary" id="signup-btn">Create account &amp; sign in</button>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== MAIN APP ===================== -->
+<div class="container" id="app-shell" hidden>
+
+  <header class="header-top">
+    <div class="brand-section">
+      <div class="logo-container">
+        <svg class="logo-icon" aria-hidden="true"><use href="#devbrain-mark"/></svg>
+        <h1 class="brand-title">DevBrain</h1>
+      </div>
+      <p class="brand-subtitle">Turn your notes, docs, and code into an interactive knowledge base. Get precise answers sourced exclusively from your data—never from the open web.</p>
+    </div>
+
+    <div class="user-card glass-panel" id="whoami">
+      <div class="avatar">
+        <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      </div>
+      <div class="user-info">
+        <span class="user-name"><span class="lead">Welcome:</span> <strong id="welcome-name">&mdash;</strong></span>
+        <span class="admin-badge" id="role-pill" hidden>ADMIN</span>
+      </div>
+      <button type="button" class="sign-out" id="logout-btn">Sign out</button>
     </div>
   </header>
 
-  <form id="ask-form">
-    <label class="sr-only" for="question">Your question</label>
-    <div class="field">
-      <textarea id="question" rows="1"
-        placeholder="e.g. What's our standard approach to database migrations?"
-        autocomplete="off" autofocus></textarea>
-      <button type="submit" id="submit-btn">Ask</button>
+  <section class="status-bar glass-panel" id="status" role="status" aria-live="polite">
+    <div class="status-indicator">
+      <span class="dot load" id="status-dot"></span>
+      <span id="status-text">Checking backend&hellip;</span>
     </div>
-    <div class="hint">
-      <span><kbd>Enter</kbd> to send &nbsp;·&nbsp; <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</span>
-      <span id="char-count"></span>
+  </section>
+
+  <main class="main-interface glass-panel">
+
+    <aside class="sidebar" role="tablist">
+      <button type="button" class="nav-item is-active" id="tab-ask" role="tab" aria-selected="true" aria-controls="panel-ask">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+        Ask
+      </button>
+      <button type="button" class="nav-item" id="tab-upload" role="tab" aria-selected="false" aria-controls="panel-upload">
+        <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+        Upload
+      </button>
+      <button type="button" class="nav-item" id="tab-mydocs" role="tab" aria-selected="false" aria-controls="panel-mydocs">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+        My docs
+      </button>
+      <button type="button" class="nav-item admin-only" id="tab-users" role="tab" aria-selected="false" aria-controls="panel-users" hidden>
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        Manage users
+      </button>
+      <button type="button" class="nav-item admin-only" id="tab-docs" role="tab" aria-selected="false" aria-controls="panel-docs" hidden>
+        <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+        Manage docs
+      </button>
+    </aside>
+
+    <div class="content">
+
+      <!-- ============ ASK ============ -->
+      <section class="panel" id="panel-ask" role="tabpanel" aria-labelledby="tab-ask">
+
+        <!-- Composer first: you type at the top, the answer appears below. -->
+        <div class="ask-composer">
+          <form id="ask-form">
+            <label class="sr-only" for="question">Your question</label>
+            <div class="input-wrapper">
+              <textarea id="question" rows="1"
+                placeholder="e.g. What's our standard approach to database migrations?"
+                autocomplete="off"></textarea>
+              <button type="submit" class="ask-btn" id="submit-btn">Ask</button>
+            </div>
+            <div class="shortcuts">
+              <span><span class="key">Enter</span> to send &middot; <span class="key">Shift</span> + <span class="key">Enter</span> for a new line</span>
+              <span id="char-count"></span>
+            </div>
+          </form>
+
+          <div class="examples" id="examples" hidden>
+            <div class="examples-label">Try one of these</div>
+            <div class="chips" id="chips"></div>
+          </div>
+        </div>
+
+        <div class="result" id="result" aria-live="polite"></div>
+      </section>
+
+      <!-- ============ UPLOAD ============ -->
+      <section class="panel" id="panel-upload" role="tabpanel" aria-labelledby="tab-upload" hidden>
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Upload documents</h2>
+            <p class="panel-sub">Files are saved to the data folder and indexed immediately.</p>
+          </div>
+        </div>
+
+        <div class="drop" id="drop-zone">
+          <div class="drop-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+          </div>
+          <div class="drop-title">Drag files here, or <button type="button" class="link-btn" id="browse-btn">browse</button></div>
+          <div class="drop-sub">PDF, Word, Excel, Markdown or plain text &middot; up to 25 MB each</div>
+          <input type="file" id="file-input" multiple hidden
+                 accept=".pdf,.docx,.txt,.md,.markdown,.log,.csv,.xlsx,.xlsm" />
+        </div>
+
+        <div class="queue" id="upload-queue" hidden></div>
+
+        <div class="purpose-row" id="purpose-row" hidden>
+          <label for="purpose-input">Document purpose <span class="req">*</span>
+            <span class="opt">&mdash; stored with the file, your name and the upload date</span></label>
+          <input type="text" id="purpose-input" maxlength="200" required
+                 placeholder="e.g. SQL reference for the reporting team" />
+        </div>
+
+        <div class="upload-actions" id="upload-actions" hidden>
+          <button type="button" class="primary" id="upload-btn">Upload &amp; ingest</button>
+          <button type="button" class="ghost" id="clear-btn">Clear</button>
+        </div>
+
+        <div class="result" id="upload-result" aria-live="polite" style="margin-top:18px"></div>
+      </section>
+
+      <!-- ============ MY DOCS ============ -->
+      <section class="panel" id="panel-mydocs" role="tabpanel" aria-labelledby="tab-mydocs" hidden>
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">My documents</h2>
+            <p class="panel-sub">Everything you have contributed to the knowledge base.</p>
+          </div>
+          <button type="button" class="ghost small" id="refresh-mydocs">Refresh</button>
+        </div>
+        <div id="mydocs-body"></div>
+      </section>
+
+      <!-- ============ MANAGE USERS (admin) ============ -->
+      <section class="panel" id="panel-users" role="tabpanel" aria-labelledby="tab-users" hidden>
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Manage users</h2>
+            <p class="panel-sub">Deleting a user ends their sessions immediately and blocks future sign-ins.</p>
+          </div>
+          <button type="button" class="ghost small" id="refresh-users">Refresh</button>
+        </div>
+        <div id="users-body"></div>
+      </section>
+
+      <!-- ============ MANAGE DOCS (admin) ============ -->
+      <section class="panel" id="panel-docs" role="tabpanel" aria-labelledby="tab-docs" hidden>
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Manage documents</h2>
+            <p class="panel-sub">Deleting a document removes its file and its chunks, refreshing the index at once.</p>
+          </div>
+          <button type="button" class="ghost small" id="refresh-docs">Refresh</button>
+        </div>
+        <div id="docs-body"></div>
+      </section>
+
     </div>
-  </form>
+  </main>
 
-  <div class="examples" id="examples" hidden>
-    <div class="examples-label">Try one of these</div>
-    <div class="chips" id="chips"></div>
-  </div>
-
-  <div class="result" id="result" aria-live="polite"></div>
-
-  <footer id="footer"></footer>
+  <footer id="footer" hidden></footer>
 </div>
 
 <script>
@@ -405,25 +1060,26 @@ async function checkHealth() {
 
     els.statusDot.className = `dot ${style.dot}`;
 
-    const parts = [`<strong>${esc(style.text(health))}</strong>`];
-    if (health.detail) parts.push(esc(health.detail));
+    let html = `<span class="status-text">${esc(style.text(health))}</span>`;
+    if (health.detail) html += ` <span class="status-detail">${esc(health.detail)}</span>`;
     if (health.status === "ok" || health.status === "empty") {
-      parts.push(
-        `<span class="sep">|</span> chat <code>${esc(health.chat_model)}</code>`,
-        `<span class="sep">|</span> embeddings <code>${esc(health.embedding_model)}</code>`,
-        `<span class="sep">|</span> LangSmith ${health.langsmith_tracing
-            ? `<code>${esc(health.langsmith_project)}</code>` : "off"}`
-      );
+      html +=
+        `<span class="tag-group">` +
+          `<span class="tag">chat <span>${esc(health.chat_model)}</span></span>` +
+          `<span class="tag">embeddings <span>${esc(health.embedding_model)}</span></span>` +
+          `<span class="tag">LangSmith <span>${health.langsmith_tracing
+              ? esc(health.langsmith_project) : "off"}</span></span>` +
+        `</span>`;
     }
-    els.statusText.innerHTML = parts.join(" ");
+    els.statusText.innerHTML = html;
 
     buildExamples(health);
     return health;
   } catch {
     els.statusDot.className = "dot err";
     els.statusText.innerHTML =
-      "<strong>Backend unreachable.</strong> Start it with " +
-      "<code>uvicorn app:app --reload --port 8001</code>";
+      '<span class="status-text">Backend unreachable</span>' +
+      '<span class="status-detail">Start it with: uvicorn app:app --reload --port 8001</span>';
     return null;
   }
 }
@@ -496,6 +1152,7 @@ function showAnswer(data) {
                ${esc(s.source)}
                ${s.file_type ? `<span class="badge">${esc(s.file_type)}</span>` : ""}
                ${s.locations.length ? `<span class="badge">${esc(s.locations.join(", "))}</span>` : ""}
+               ${s.uploaded_by ? `<span class="credit">uploaded by ${esc(s.uploaded_by)}</span>` : ""}
              </div>
              ${s.snippet ? `<div class="source-snippet">${esc(s.snippet)}</div>` : ""}
            </div>`).join("")}
@@ -525,11 +1182,13 @@ async function ask(question) {
     const response = await fetch(`${API_BASE}/api/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify({ question }),
     });
 
     const payload = await response.json().catch(() => null);
 
+    if (handleAuthFailure(response.status)) return;
     if (!response.ok) {
       // FastAPI reports errors as {detail: ...}; validation errors use a list.
       let detail = payload && payload.detail;
@@ -587,7 +1246,8 @@ els.form.addEventListener("submit", (event) => {
 
 // Initial load, then a slow poll so the banner self-heals once you start
 // the containers or finish an ingestion run.
-checkHealth().then((health) => {
+// checkHealth() now runs from showApp(), once we know who is signed in.
+function renderFooter(health) {
   els.footer.innerHTML = health
     ? `Collection <code>${esc(health.collection)}</code> · ` +
       `<a href="${API_BASE}/docs" target="_blank" rel="noreferrer">API docs</a> · ` +
@@ -596,8 +1256,705 @@ checkHealth().then((health) => {
         ? ` · <a href="https://smith.langchain.com" target="_blank" rel="noreferrer">LangSmith traces</a>`
         : "")
     : `<a href="${API_BASE}/docs" target="_blank" rel="noreferrer">API docs</a>`;
+}
+setInterval(() => { if (currentUser) checkHealth(); }, 15000);
+
+/* =======================================================================
+   Tabs + document upload
+   -----------------------------------------------------------------------
+   Appended below the original script, so nothing above it is modified.
+   Uses its own element handles and its own state; the Ask flow, the health
+   poller and renderMarkdown() are all reused as-is.
+
+   Upload flow:
+     1. user picks or drops files  -> held locally in `queued`, nothing sent
+     2. "Upload & ingest" POSTs them as multipart/form-data
+     3. the server saves them into /data AND ingests them in the same request
+     4. we re-poll /api/health so the chunk count updates immediately
+   ======================================================================= */
+
+const up = {
+  tabAsk:      document.getElementById("tab-ask"),
+  tabUpload:   document.getElementById("tab-upload"),
+  panelAsk:    document.getElementById("panel-ask"),
+  panelUpload: document.getElementById("panel-upload"),
+  drop:        document.getElementById("drop-zone"),
+  input:       document.getElementById("file-input"),
+  browse:      document.getElementById("browse-btn"),
+  queue:       document.getElementById("upload-queue"),
+  actions:     document.getElementById("upload-actions"),
+  uploadBtn:   document.getElementById("upload-btn"),
+  clearBtn:    document.getElementById("clear-btn"),
+  result:      document.getElementById("upload-result"),
+};
+
+const ALLOWED = [".pdf", ".docx", ".txt", ".md", ".markdown", ".log", ".csv", ".xlsx", ".xlsm"];
+const MAX_BYTES = 25 * 1024 * 1024;
+
+let queued = [];
+let uploading = false;
+
+/* Tab switching is defined further down, once the admin tabs exist. */
+
+/* ------------------------------ picking files ------------------------------ */
+
+function fmtBytes(n) {
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n / 1024).toFixed(0) + " KB";
+  return (n / 1048576).toFixed(1) + " MB";
+}
+
+function extOf(name) {
+  const i = name.lastIndexOf(".");
+  return i < 0 ? "" : name.slice(i).toLowerCase();
+}
+
+/* Validate client-side purely for fast feedback. The server re-validates
+   everything independently — a browser check is a convenience, never a
+   security control. */
+function problemWith(file) {
+  if (!ALLOWED.includes(extOf(file.name))) return "Unsupported type";
+  if (file.size === 0) return "Empty file";
+  if (file.size > MAX_BYTES) return "Over 25 MB";
+  return "";
+}
+
+function addFiles(fileList) {
+  for (const f of fileList) {
+    if (queued.some((q) => q.name === f.name && q.size === f.size)) continue;
+    queued.push(f);
+  }
+  renderQueue();
+}
+
+function renderQueue() {
+  if (!queued.length) {
+    up.queue.hidden = true;
+    up.actions.hidden = true;
+    auth.purposeRow.hidden = true;
+    up.queue.innerHTML = "";
+    return;
+  }
+  up.queue.hidden = false;
+  up.actions.hidden = false;
+  auth.purposeRow.hidden = false;
+
+  up.queue.innerHTML = queued
+    .map((f, i) => {
+      const problem = problemWith(f);
+      const ext = extOf(f.name).replace(".", "") || "?";
+      return [
+        '<div class="qrow' + (problem ? " bad" : "") + '">',
+        '<span class="qext">' + esc(ext) + "</span>",
+        '<span class="qname">' + esc(f.name) + "</span>",
+        '<span class="qsize">' + esc(problem || fmtBytes(f.size)) + "</span>",
+        '<button type="button" class="qdel" data-i="' + i + '" title="Remove">&times;</button>',
+        "</div>",
+      ].join("");
+    })
+    .join("");
+
+  up.queue.querySelectorAll(".qdel").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      queued.splice(Number(btn.dataset.i), 1);
+      renderQueue();
+    });
+  });
+}
+
+up.browse.addEventListener("click", () => up.input.click());
+up.drop.addEventListener("click", (e) => { if (e.target === up.drop) up.input.click(); });
+up.input.addEventListener("change", () => { addFiles(up.input.files); up.input.value = ""; });
+
+["dragenter", "dragover"].forEach((ev) =>
+  up.drop.addEventListener(ev, (e) => { e.preventDefault(); up.drop.classList.add("over"); })
+);
+["dragleave", "drop"].forEach((ev) =>
+  up.drop.addEventListener(ev, (e) => { e.preventDefault(); up.drop.classList.remove("over"); })
+);
+up.drop.addEventListener("drop", (e) => {
+  if (e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files);
 });
-setInterval(checkHealth, 15000);
+
+up.clearBtn.addEventListener("click", () => {
+  queued = [];
+  renderQueue();
+  up.result.innerHTML = "";
+});
+
+/* ------------------------------ uploading ------------------------------ */
+
+const STATUS_LABEL = { ingested: "Ingested", skipped: "Skipped", failed: "Failed" };
+
+function uploadCard(title, inner, isError) {
+  return (
+    '<div class="card' + (isError ? " error" : "") + '">' +
+    '<div class="card-head"><span>' + esc(title) + "</span></div>" +
+    inner +
+    "</div>"
+  );
+}
+
+up.uploadBtn.addEventListener("click", async () => {
+  if (uploading || !queued.length) return;
+
+  const purposeText = auth.purposeInput.value.trim();
+  if (!purposeText) {
+    up.result.innerHTML = uploadCard(
+      "Purpose required",
+      '<div class="answer"><p>Describe what these documents are for before uploading. ' +
+      'It is stored alongside the file name, your username and the upload date.</p></div>',
+      true
+    );
+    auth.purposeInput.focus();
+    return;
+  }
+
+  const sendable = queued.filter((f) => !problemWith(f));
+  if (!sendable.length) {
+    up.result.innerHTML = uploadCard(
+      "Nothing to upload",
+      '<div class="answer"><p>None of the selected files are a supported type under 25 MB.</p></div>',
+      true
+    );
+    return;
+  }
+
+  uploading = true;
+  up.uploadBtn.disabled = true;
+  up.clearBtn.disabled = true;
+  up.uploadBtn.textContent = "Uploading…";
+  up.result.innerHTML = uploadCard(
+    "Uploading and ingesting…",
+    '<div class="skeleton-line" style="width:100%"></div>' +
+    '<div class="skeleton-line" style="width:88%"></div>' +
+    '<div class="skeleton-line" style="width:66%"></div>',
+    false
+  );
+
+  const form = new FormData();
+  for (const f of sendable) form.append("files", f, f.name);
+  form.append("purpose", purposeText);
+
+  try {
+    const response = await fetch(API_BASE + "/api/upload", {
+      method: "POST", body: form, credentials: "same-origin",
+    });
+    const payload = await response.json().catch(() => null);
+
+    if (handleAuthFailure(response.status)) return;
+    if (!response.ok) {
+      let detail = payload && payload.detail;
+      if (Array.isArray(detail)) detail = detail.map((d) => d.msg).join("; ");
+      up.result.innerHTML = uploadCard(
+        "Upload failed",
+        '<div class="answer">' + renderMarkdown(detail || "HTTP " + response.status) + "</div>",
+        true
+      );
+      return;
+    }
+
+    const rows = payload.files
+      .map((f) => {
+        const badges =
+          '<span class="badge ' + esc(f.status) + '">' +
+          esc(STATUS_LABEL[f.status] || f.status) + "</span>" +
+          (f.chunks ? '<span class="badge">' + f.chunks + " chunk" + (f.chunks === 1 ? "" : "s") + "</span>" : "") +
+          (f.bytes ? '<span class="badge">' + esc(fmtBytes(f.bytes)) + "</span>" : "");
+        return (
+          '<div class="source urow ' + esc(f.status) + '">' +
+          '<div class="source-name">' + esc(f.filename) + badges + "</div>" +
+          (f.detail ? '<div class="source-snippet">' + esc(f.detail) + "</div>" : "") +
+          "</div>"
+        );
+      })
+      .join("");
+
+    const meta =
+      '<span class="meta">' +
+      "<span>" + payload.ingested + " of " + payload.uploaded + " ingested</span>" +
+      '<span class="sep">·</span>' +
+      "<span>+" + payload.chunks_added + " chunks</span>" +
+      '<span class="sep">·</span>' +
+      "<span>" + payload.total_chunks + " total</span>" +
+      "</span>";
+
+    up.result.innerHTML =
+      '<div class="card">' +
+      '<div class="card-head"><span>Upload complete</span>' + meta + "</div>" +
+      '<div class="sources uplist">' + rows + "</div>" +
+      "</div>";
+
+    // Drop only the files that actually made it in, so failures stay on screen
+    // for the user to retry or remove.
+    const ok = new Set(
+      payload.files.filter((f) => f.status === "ingested").map((f) => f.filename)
+    );
+    queued = queued.filter((f) => !ok.has(f.name));
+    renderQueue();
+    if (!queued.length) auth.purposeInput.value = "";
+
+    checkHealth(); // refresh the chunk count in the status bar straight away
+  } catch (error) {
+    up.result.innerHTML = uploadCard(
+      "Upload failed",
+      '<div class="answer">' +
+        renderMarkdown("Could not reach the DevBrain API.\n\n`" + error.message + "`") +
+        "</div>",
+      true
+    );
+  } finally {
+    uploading = false;
+    up.uploadBtn.disabled = false;
+    up.clearBtn.disabled = false;
+    up.uploadBtn.textContent = "Upload & ingest";
+  }
+});
+
+
+/* =======================================================================
+   Authentication, welcome banner, and the two admin panels
+   -----------------------------------------------------------------------
+   Gatekeeping here is purely for usability — hiding a tab is not security.
+   Every /api/admin/* route independently re-checks the session and the
+   admin flag server-side, so a curious user editing the DOM gains nothing.
+   ======================================================================= */
+
+const auth = {
+  screen:    document.getElementById("auth-screen"),
+  shell:     document.getElementById("app-shell"),
+  signinTab: document.getElementById("signin-tab"),
+  signupTab: document.getElementById("signup-tab"),
+  signinFrm: document.getElementById("signin-form"),
+  signupFrm: document.getElementById("signup-form"),
+  signinMsg: document.getElementById("signin-msg"),
+  signupMsg: document.getElementById("signup-msg"),
+  signinBtn: document.getElementById("signin-btn"),
+  signupBtn: document.getElementById("signup-btn"),
+  welcome:   document.getElementById("welcome-name"),
+  rolePill:  document.getElementById("role-pill"),
+  logoutBtn: document.getElementById("logout-btn"),
+  tabUsers:  document.getElementById("tab-users"),
+  tabDocs:   document.getElementById("tab-docs"),
+  panelUsers:document.getElementById("panel-users"),
+  panelDocs: document.getElementById("panel-docs"),
+  usersBody: document.getElementById("users-body"),
+  docsBody:  document.getElementById("docs-body"),
+  refreshUsers: document.getElementById("refresh-users"),
+  refreshDocs:  document.getElementById("refresh-docs"),
+  purposeRow:   document.getElementById("purpose-row"),
+  purposeInput: document.getElementById("purpose-input"),
+};
+
+let currentUser = null;
+
+function setMsg(el, text, kind) {
+  el.textContent = text || "";
+  el.className = "auth-msg" + (text ? " " + kind : "");
+}
+
+/* ------------------------------ session ------------------------------ */
+
+function showAuthScreen() {
+  currentUser = null;
+  auth.screen.hidden = false;
+  auth.shell.hidden = true;
+  document.getElementById("signin-user").focus();
+}
+
+function showApp(user) {
+  currentUser = user;
+  auth.screen.hidden = true;
+  auth.shell.hidden = false;
+
+  auth.welcome.textContent = user.full_name || user.username;
+  auth.rolePill.hidden = !user.is_admin;
+  auth.tabUsers.hidden = !user.is_admin;
+  auth.tabDocs.hidden = !user.is_admin;
+
+  checkHealth();
+  els.question.focus();
+}
+
+async function loadSession() {
+  try {
+    const r = await fetch(API_BASE + "/api/auth/me", { credentials: "same-origin" });
+    const data = await r.json().catch(() => ({ user: null }));
+    if (data && data.user) showApp(data.user);
+    else showAuthScreen();
+  } catch {
+    showAuthScreen();
+  }
+}
+
+/* Any request may come back 401 if the account was deleted or the session
+   expired mid-use. Bounce straight back to the sign-in screen rather than
+   leaving a dead UI on screen. */
+function handleAuthFailure(status) {
+  if (status === 401) {
+    showAuthScreen();
+    setMsg(auth.signinMsg, "Your session ended. Please sign in again.", "error");
+    return true;
+  }
+  return false;
+}
+
+/* ------------------------------ sign in / up ------------------------------ */
+
+function selectAuthTab(which) {
+  const isIn = which === "signin";
+  auth.signinTab.classList.toggle("is-active", isIn);
+  auth.signupTab.classList.toggle("is-active", !isIn);
+  auth.signinFrm.hidden = !isIn;
+  auth.signupFrm.hidden = isIn;
+  setMsg(auth.signinMsg, "");
+  setMsg(auth.signupMsg, "");
+}
+
+auth.signinTab.addEventListener("click", () => selectAuthTab("signin"));
+auth.signupTab.addEventListener("click", () => selectAuthTab("signup"));
+
+async function postJSON(path, body) {
+  const r = await fetch(API_BASE + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => null);
+  return { ok: r.ok, status: r.status, data };
+}
+
+function errorText(data, fallback) {
+  let d = data && data.detail;
+  if (Array.isArray(d)) d = d.map((x) => x.msg).join("; ");
+  return d || fallback;
+}
+
+auth.signinFrm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const username = document.getElementById("signin-user").value.trim();
+  const password = document.getElementById("signin-pass").value;
+  if (!username || !password) return;
+
+  auth.signinBtn.disabled = true;
+  auth.signinBtn.textContent = "Signing in…";
+  setMsg(auth.signinMsg, "");
+
+  try {
+    const { ok, data, status } = await postJSON("/api/auth/login", { username, password });
+    if (!ok) {
+      setMsg(auth.signinMsg, errorText(data, "Sign-in failed (HTTP " + status + ")."), "error");
+      return;
+    }
+    document.getElementById("signin-pass").value = "";
+    showApp(data.user);
+  } catch (err) {
+    setMsg(auth.signinMsg, "Cannot reach the server. Is it running?", "error");
+  } finally {
+    auth.signinBtn.disabled = false;
+    auth.signinBtn.textContent = "Sign in";
+  }
+});
+
+auth.signupFrm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const payload = {
+    username:  document.getElementById("signup-user").value.trim(),
+    full_name: document.getElementById("signup-name").value.trim(),
+    email:     document.getElementById("signup-email").value.trim(),
+    password:  document.getElementById("signup-pass").value,
+  };
+  if (payload.password.length < 8) {
+    setMsg(auth.signupMsg, "Password must be at least 8 characters.", "error");
+    return;
+  }
+
+  auth.signupBtn.disabled = true;
+  auth.signupBtn.textContent = "Creating…";
+  setMsg(auth.signupMsg, "");
+
+  try {
+    const { ok, data, status } = await postJSON("/api/auth/register", payload);
+    if (!ok) {
+      setMsg(auth.signupMsg, errorText(data, "Could not create the account (HTTP " + status + ")."), "error");
+      return;
+    }
+    document.getElementById("signup-pass").value = "";
+    showApp(data.user);
+  } catch (err) {
+    setMsg(auth.signupMsg, "Cannot reach the server. Is it running?", "error");
+  } finally {
+    auth.signupBtn.disabled = false;
+    auth.signupBtn.textContent = "Create account & sign in";
+  }
+});
+
+auth.logoutBtn.addEventListener("click", async () => {
+  try {
+    await fetch(API_BASE + "/api/auth/logout", { method: "POST", credentials: "same-origin" });
+  } catch { /* signing out locally is still the right outcome */ }
+  els.result.innerHTML = "";
+  up.result.innerHTML = "";
+  queued = [];
+  renderQueue();
+  selectTab("ask");
+  showAuthScreen();
+});
+
+/* ------------------------------ admin: users ------------------------------ */
+
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d) ? "—" : d.toLocaleString(undefined,
+    { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function adminNotice(el, text, ok) {
+  const n = document.createElement("div");
+  n.className = "anotice " + (ok ? "ok" : "bad");
+  n.textContent = text;
+  el.prepend(n);
+  setTimeout(() => n.remove(), 6000);
+}
+
+async function loadUsers() {
+  auth.usersBody.innerHTML = '<div class="atable"><div class="aempty">Loading…</div></div>';
+  try {
+    const r = await fetch(API_BASE + "/api/admin/users", { credentials: "same-origin" });
+    if (handleAuthFailure(r.status)) return;
+    const data = await r.json();
+    if (!r.ok) {
+      auth.usersBody.innerHTML =
+        '<div class="atable"><div class="aempty">' + esc(errorText(data, "Failed to load")) + "</div></div>";
+      return;
+    }
+
+    const head =
+      '<div class="arow head">' +
+      '<span class="acol main">User</span>' +
+      '<span class="acol mid">Email</span>' +
+      '<span class="acol sm">Docs</span>' +
+      '<span class="acol mid">Last sign-in</span>' +
+      '<span class="acol act">Action</span></div>';
+
+    const rows = data.users.map((u) => {
+      const isSelf = u.id === data.me;
+      const canDelete = !isSelf;
+      return (
+        '<div class="arow">' +
+        '<span class="acol main"><span class="aname amono">' + esc(u.username) +
+          (u.is_admin ? '<span class="role-pill">Admin</span>' : "") +
+          (isSelf ? '<span class="badge">you</span>' : "") + "</span>" +
+          (u.full_name ? '<span class="asub">' + esc(u.full_name) + "</span>" : "") + "</span>" +
+        '<span class="acol mid aval">' + esc(u.email || "—") + "</span>" +
+        '<span class="acol sm aval">' + u.documents + "</span>" +
+        '<span class="acol mid aval">' + esc(fmtDate(u.last_login_at)) + "</span>" +
+        '<span class="acol act">' +
+          '<button type="button" class="adel" data-id="' + u.id + '" data-name="' + esc(u.username) + '"' +
+          (canDelete ? "" : " disabled title=\"You cannot delete your own account\"") + ">Delete</button>" +
+        "</span></div>"
+      );
+    }).join("");
+
+    auth.usersBody.innerHTML = '<div class="atable">' + head + rows + "</div>";
+
+    auth.usersBody.querySelectorAll(".adel").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const name = btn.dataset.name;
+        if (!confirm('Delete user "' + name + '"?\n\nTheir active sessions end immediately and they will not be able to sign in again.\n\nDocuments they uploaded are kept.')) return;
+        btn.disabled = true;
+        btn.textContent = "Deleting…";
+        try {
+          const r = await fetch(API_BASE + "/api/admin/users/" + btn.dataset.id,
+                                { method: "DELETE", credentials: "same-origin" });
+          if (handleAuthFailure(r.status)) return;
+          const d = await r.json().catch(() => null);
+          await loadUsers();
+          adminNotice(auth.usersBody, r.ok
+            ? 'User "' + name + '" deleted.'
+            : errorText(d, "Delete failed."), r.ok);
+        } catch {
+          btn.disabled = false;
+          btn.textContent = "Delete";
+          adminNotice(auth.usersBody, "Could not reach the server.", false);
+        }
+      });
+    });
+  } catch {
+    auth.usersBody.innerHTML = '<div class="atable"><div class="aempty">Could not reach the server.</div></div>';
+  }
+}
+
+/* ------------------------------ admin: documents ------------------------------ */
+
+async function loadDocs() {
+  auth.docsBody.innerHTML = '<div class="atable"><div class="aempty">Loading…</div></div>';
+  try {
+    const r = await fetch(API_BASE + "/api/admin/documents", { credentials: "same-origin" });
+    if (handleAuthFailure(r.status)) return;
+    const data = await r.json();
+    if (!r.ok) {
+      auth.docsBody.innerHTML =
+        '<div class="atable"><div class="aempty">' + esc(errorText(data, "Failed to load")) + "</div></div>";
+      return;
+    }
+
+    if (!data.documents.length) {
+      auth.docsBody.innerHTML =
+        '<div class="atable"><div class="aempty">No documents yet. Upload one from the Upload tab.</div></div>';
+      return;
+    }
+
+    const head =
+      '<div class="arow head">' +
+      '<span class="acol main">Document</span>' +
+      '<span class="acol mid">Purpose</span>' +
+      '<span class="acol sm">Type</span>' +
+      '<span class="acol mid">Uploaded by</span>' +
+      '<span class="acol act">Action</span></div>';
+
+    const rows = data.documents.map((d) => (
+      '<div class="arow">' +
+      '<span class="acol main"><span class="aname amono">' + esc(d.source) +
+        '<span class="badge">' + d.chunks + " chunk" + (d.chunks === 1 ? "" : "s") + "</span>" +
+        (d.on_disk ? "" : '<span class="badge failed">file missing</span>') + "</span>" +
+        '<span class="asub">' + esc(fmtDate(d.uploaded_at)) +
+        (d.size_bytes ? " · " + esc(fmtBytes(d.size_bytes)) : "") + "</span></span>" +
+      '<span class="acol mid aval">' + esc(d.purpose || "—") + "</span>" +
+      '<span class="acol sm"><span class="badge">' + esc(d.file_type || "?") + "</span></span>" +
+      '<span class="acol mid aval">' + esc(d.uploaded_by) + "</span>" +
+      '<span class="acol act">' +
+        '<button type="button" class="adel" data-src="' + esc(d.source) + '">Delete</button>' +
+      "</span></div>"
+    )).join("");
+
+    auth.docsBody.innerHTML = '<div class="atable">' + head + rows + "</div>";
+
+    auth.docsBody.querySelectorAll(".adel").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const src = btn.dataset.src;
+        if (!confirm('Delete "' + src + '"?\n\nThe file is removed from the data folder and all of its chunks are deleted from the index. This cannot be undone.')) return;
+        btn.disabled = true;
+        btn.textContent = "Deleting…";
+        try {
+          const r = await fetch(API_BASE + "/api/admin/documents/" + encodeURIComponent(src),
+                                { method: "DELETE", credentials: "same-origin" });
+          if (handleAuthFailure(r.status)) return;
+          const d = await r.json().catch(() => null);
+          await loadDocs();
+          checkHealth();       // chunk count in the status bar changed
+          adminNotice(auth.docsBody, r.ok
+            ? 'Deleted "' + src + '" — ' + d.chunks_removed + " chunk(s) removed, index refreshed."
+            : errorText(d, "Delete failed."), r.ok);
+        } catch {
+          btn.disabled = false;
+          btn.textContent = "Delete";
+          adminNotice(auth.docsBody, "Could not reach the server.", false);
+        }
+      });
+    });
+  } catch {
+    auth.docsBody.innerHTML = '<div class="atable"><div class="aempty">Could not reach the server.</div></div>';
+  }
+}
+
+/* ------------------------------ my documents ------------------------------ */
+
+auth.mydocsBody = document.getElementById("mydocs-body");
+auth.tabMydocs  = document.getElementById("tab-mydocs");
+auth.panelMydocs = document.getElementById("panel-mydocs");
+auth.refreshMydocs = document.getElementById("refresh-mydocs");
+
+async function loadMyDocs() {
+  auth.mydocsBody.innerHTML = '<div class="atable"><div class="aempty">Loading…</div></div>';
+  try {
+    const r = await fetch(API_BASE + "/api/my/documents", { credentials: "same-origin" });
+    if (handleAuthFailure(r.status)) return;
+    const data = await r.json();
+    if (!r.ok) {
+      auth.mydocsBody.innerHTML =
+        '<div class="atable"><div class="aempty">' + esc(errorText(data, "Failed to load")) + "</div></div>";
+      return;
+    }
+
+    if (!data.documents.length) {
+      auth.mydocsBody.innerHTML =
+        '<div class="atable"><div class="aempty">' +
+        "You have not uploaded anything yet. Use the Upload documents tab to contribute." +
+        "</div></div>";
+      return;
+    }
+
+    const head =
+      '<div class="arow head">' +
+      '<span class="acol main">Document</span>' +
+      '<span class="acol mid">Purpose</span>' +
+      '<span class="acol sm">Type</span>' +
+      '<span class="acol mid">Uploaded</span></div>';
+
+    const rows = data.documents.map((d) => (
+      '<div class="arow">' +
+      '<span class="acol main"><span class="aname amono">' + esc(d.source) +
+        '<span class="badge">' + d.chunks + " chunk" + (d.chunks === 1 ? "" : "s") + "</span>" +
+        (d.on_disk ? "" : '<span class="badge failed">file missing</span>') + "</span>" +
+        (d.size_bytes ? '<span class="asub">' + esc(fmtBytes(d.size_bytes)) + "</span>" : "") +
+      "</span>" +
+      '<span class="acol mid aval">' + esc(d.purpose || "—") + "</span>" +
+      '<span class="acol sm"><span class="badge">' + esc(d.file_type || "?") + "</span></span>" +
+      '<span class="acol mid aval">' + esc(fmtDate(d.uploaded_at)) + "</span>" +
+      "</div>"
+    )).join("");
+
+    const summary =
+      '<p class="admin-sub" style="margin:12px 0 0">' +
+      data.documents.length + " document" + (data.documents.length === 1 ? "" : "s") +
+      " · " + data.total_chunks + " searchable chunk" + (data.total_chunks === 1 ? "" : "s") +
+      ". Only an administrator can delete documents.</p>";
+
+    auth.mydocsBody.innerHTML = '<div class="atable">' + head + rows + "</div>" + summary;
+  } catch {
+    auth.mydocsBody.innerHTML = '<div class="atable"><div class="aempty">Could not reach the server.</div></div>';
+  }
+}
+
+auth.refreshMydocs.addEventListener("click", loadMyDocs);
+auth.refreshUsers.addEventListener("click", loadUsers);
+auth.refreshDocs.addEventListener("click", loadDocs);
+
+/* ------------------------------ tab wiring ------------------------------ */
+
+/* Replaces the two-tab switcher defined earlier now that there are four. */
+function selectTab(which) {
+  const panels = {
+    ask:    [auth.shell.querySelector("#tab-ask"),    document.getElementById("panel-ask")],
+    upload: [auth.shell.querySelector("#tab-upload"), document.getElementById("panel-upload")],
+    mydocs: [auth.tabMydocs, auth.panelMydocs],
+    users:  [auth.tabUsers,  auth.panelUsers],
+    docs:   [auth.tabDocs,   auth.panelDocs],
+  };
+  for (const [name, [tab, panel]] of Object.entries(panels)) {
+    const active = name === which;
+    tab.classList.toggle("is-active", active);
+    tab.setAttribute("aria-selected", String(active));
+    panel.hidden = !active;
+  }
+  if (which === "ask") els.question.focus();
+  if (which === "mydocs") loadMyDocs();
+  if (which === "users") loadUsers();
+  if (which === "docs") loadDocs();
+}
+
+up.tabAsk.addEventListener("click", () => selectTab("ask"));
+up.tabUpload.addEventListener("click", () => selectTab("upload"));
+auth.tabMydocs.addEventListener("click", () => selectTab("mydocs"));
+auth.tabUsers.addEventListener("click", () => selectTab("users"));
+auth.tabDocs.addEventListener("click", () => selectTab("docs"));
+
+/* ------------------------------ boot ------------------------------ */
+
+loadSession();
 </script>
 </body>
 </html>

@@ -89,24 +89,54 @@ services:
     container_name: devbrain-app
     restart: unless-stopped
 
-    # Load every setting from your .env. Nothing is baked into the image.
+    # ---- Configuration ------------------------------------------------------
+    # Secrets are never baked into the image. They arrive at RUN time, from
+    # your shell's environment variables first and a .env file second.
+    #
+    # `required: false` means the stack still starts with no .env at all, which
+    # is how you would run it on a server: export the variables (or use your
+    # platform's App Settings / secret store) and skip the file entirely.
     env_file:
-      - .env
+      - path: .env
+        required: false
 
     environment:
+      # Bare NAME (no "=") means: pass this through from the host environment
+      # if it is set, otherwise leave it alone so the env_file value stands.
+      # This is what makes `$env:OPENAI_API_KEY = "..."` in your shell win over
+      # whatever happens to be in .env.
+      - OPENAI_API_KEY
+      - OPENAI_MODEL
+      - OPENAI_TEMPERATURE
+      - COHERE_API_KEY
+      - COHERE_EMBED_MODEL
+      - LANGSMITH_TRACING
+      - LANGSMITH_API_KEY
+      - LANGSMITH_PROJECT
+      - LANGSMITH_ENDPOINT
+      - COLLECTION_NAME
+      - CHUNK_SIZE
+      - CHUNK_OVERLAP
+      - RETRIEVER_K
+      - RETRIEVER_SCORE_THRESHOLD
+      - ADMIN_USERNAME
+      - ADMIN_PASSWORD
+      - ADMIN_FULL_NAME
+      - ADMIN_EMAIL
+
       # THE most important line in this file, and the mistake everyone makes.
       #
       # `localhost` inside a container means THAT CONTAINER, not your machine.
-      # So the host-facing `localhost:5433` from .env cannot work here.
-      # Containers on the same Compose network reach each other by SERVICE NAME
-      # on the container's INTERNAL port:
+      # So the host-facing `localhost:5433` cannot work here. Containers on the
+      # same Compose network reach each other by SERVICE NAME on the
+      # container's INTERNAL port:
       #
       #     from your host      -> localhost:5433   (the published port)
       #     from this container -> postgres:5432    (service name, internal port)
       #
-      # This value overrides DATABASE_URL from env_file above.
-      DATABASE_URL: postgresql+psycopg://devbrain:devbrain_pass@postgres:5432/devbrain
-      API_PORT: "8001"
+      # Pinned with "=" so it always overrides whatever the host or .env says.
+      - DATABASE_URL=postgresql+psycopg://devbrain:devbrain_pass@postgres:5432/devbrain
+      - API_PORT=8001
 
     ports:
       # Host port is configurable so it cannot clash with a uvicorn you are
@@ -114,9 +144,10 @@ services:
       - "${API_HOST_PORT:-8001}:8001"
 
     volumes:
-      # Your documents, mounted read-only. Mounting rather than copying means
-      # you can add notes and re-ingest without rebuilding the image.
-      - ./data:/app/data:ro
+      # Your documents, mounted READ-WRITE. Mounting rather than copying means
+      # you can add notes and re-ingest without rebuilding the image — and the
+      # upload endpoint needs write access to save files here.
+      - ./data:/app/data
 
     depends_on:
       postgres:

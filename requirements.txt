@@ -5,6 +5,7 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 python-dotenv==1.2.3
+python-multipart==0.0.20         # required by FastAPI to parse file uploads
 
 # --- LangChain core + integrations ---
 langchain-core==1.6.1
@@ -12,6 +13,9 @@ langchain-text-splitters==1.1.2
 langchain-openai==1.6.0          # LLM: answer generation
 langchain-cohere==0.6.0          # Embeddings: text -> vectors
 langchain-postgres==0.0.17       # Vector store: pgvector-backed
+
+# --- Authentication ---
+bcrypt==4.3.0                    # password hashing for user accounts
 
 # --- Observability ---
 langsmith==0.11.1

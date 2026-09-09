@@ -95,36 +95,80 @@ three into one file in the next step.
 
 Open a terminal **in the project folder** (in VS Code: `Terminal → New Terminal`).
 
-### Step 3.1 — Create the `.env` file
+### Step 3.1 — Supply your API keys
+
+DevBrain reads every setting from **application (environment) variables**.
+Nothing is hard-coded, and the application never writes secrets to disk.
+
+**Recommended — no secrets in any file:**
 
 ```powershell
-copy .env.example .env
+.\set-env.ps1
 ```
+
+It prompts for each key with masked input and saves them as Windows **user**
+environment variables, so they persist across reboots and are picked up by
+every terminal, VS Code and Docker Compose. No administrator rights needed.
+
+```powershell
+.\set-env.ps1 -Show     # which variables are set (values never shown)
+.\set-env.ps1 -Clear    # remove them all
+```
+
+Restart any open terminal or VS Code window afterwards — they still hold the
+old environment.
+
+<details>
+<summary>Just this session (PowerShell)</summary>
+
+```powershell
+$env:OPENAI_API_KEY    = "sk-..."
+$env:COHERE_API_KEY    = "..."
+$env:LANGSMITH_API_KEY = "lsv2_pt_..."
+```
+
+</details>
 
 <details>
 <summary>macOS / Linux</summary>
 
 ```bash
-cp .env.example .env
+export OPENAI_API_KEY=sk-...
+export COHERE_API_KEY=...
+export LANGSMITH_API_KEY=lsv2_pt_...
 ```
 
 </details>
 
-Now open `.env` in VS Code and paste your three keys. Only these three lines
-need changing:
+**Alternative — a local `.env` file** (development convenience only):
 
-```ini
-OPENAI_API_KEY=sk-your-real-key-here
-COHERE_API_KEY=your-real-cohere-key-here
-LANGSMITH_API_KEY=lsv2_pt_your-real-key-here
+```powershell
+copy .env.example .env
 ```
 
-Leave everything else alone for now.
+A real environment variable always wins over `.env`. To ignore the file
+entirely, set `DEVBRAIN_IGNORE_ENV_FILE=1`.
 
-> **Common mistakes:** do not wrap the key in quotes, do not put spaces around
-> the `=`, and make sure the file is named exactly `.env` — Windows Explorer
-> likes to save it as `.env.txt`. VS Code shows the real file name in the editor
-> tab, so check there.
+### Checking where a value came from
+
+The server prints the origin of every setting at start-up — names and sources
+only, never values:
+
+```
+Config source   : 4 from environment, 17 from .env, 0 default
+  OPENAI_API_KEY     <- environment
+  COHERE_API_KEY     <- environment
+  LANGSMITH_API_KEY  <- .env
+  ADMIN_PASSWORD     <- environment
+```
+
+`GET /api/config` returns the same mapping, so "which key is it actually
+using?" is answerable without exposing anything.
+
+> **If you use the `.env` route:** don't wrap values in quotes, don't put
+> spaces around the `=`, and make sure the file is named exactly `.env` —
+> Windows Explorer likes to save it as `.env.txt`. VS Code shows the real file
+> name in the editor tab, so check there.
 
 ### Step 3.2 — Install the Python dependencies
 
@@ -268,7 +312,61 @@ INFO     devbrain  Open the UI at http://localhost:8001
 INFO:     Uvicorn running on http://127.0.0.1:8001
 ```
 
-### Step 4.4 — Ask your first question
+### Step 4.4 — Sign in
+
+DevBrain requires an account. Nobody can search or upload while signed out.
+
+**Administrator** — seeded automatically from `ADMIN_USERNAME` / `ADMIN_PASSWORD`
+in your `.env` the first time the app starts. Only the bcrypt **hash** is stored
+in Postgres; the plaintext never reaches the database.
+
+**Everyone else** — clicks **Create account** on the sign-in screen. Self-service
+registration always produces a standard (non-admin) user. Administrators can
+only ever be seeded from `.env`, so nobody can register their way to admin.
+
+> Seeding only ever *creates*. If the admin account already exists it is left
+> alone, so changing the password later is not undone by the next restart.
+> **Change `ADMIN_PASSWORD` from the shipped value before deploying anywhere
+> shared.**
+
+Once signed in, your name appears top-right as *Welcome: [name]*, with a
+**Sign out** button.
+
+### What each role can do
+
+| | Standard user | Administrator |
+|---|---|---|
+| Ask questions | Yes | Yes |
+| Upload documents | Yes | Yes |
+| **My documents** tab | Yes (own only) | Yes (own only) |
+| **Manage users** tab | — | Yes |
+| **Manage documents** tab | — | Yes (all users') |
+
+**My documents** is available to everyone. It lists what *you* uploaded, with
+each document's purpose, type, size, upload date and live chunk count. The
+listing is scoped on the server by your user id, so one person can never see
+another's uploads. Only an administrator can delete documents.
+
+**Manage users** lists every account with their email, document count and last
+sign-in. Deleting a user ends their active sessions **immediately** and blocks
+future sign-ins. Documents they uploaded are kept — the knowledge base should not
+lose content because someone left — and their name stays on those documents as
+an audit trail. You cannot delete your own account, and the last remaining
+administrator cannot be deleted.
+
+**Manage documents** lists every document with its type, purpose, uploader and
+live chunk count. Deleting one removes the file from `data/` **and** its chunks
+from the index in the same action, so the index is refreshed instantly — no
+re-ingestion step.
+
+### Who uploaded what
+
+Every upload records the uploader and timestamp. That attribution is stamped
+onto each chunk, so when an answer cites a document the UI shows
+*uploaded by [name]* beside the source. Files ingested from the command line
+(rather than through the browser) are attributed to `system`.
+
+### Step 4.5 — Ask your first question
 
 Open <http://localhost:8001>.
 
@@ -305,7 +403,33 @@ uvicorn app:app --reload --port 8001
 
 Then open <http://localhost:8001>.
 
-**When you add or change documents**, re-run ingestion:
+### Adding documents from the browser (easiest)
+
+Open the **Upload documents** tab, drag your files in, and click
+**Upload & ingest**. Files are saved into `data/` and ingested in the same
+request — by the time the result appears, they are already searchable. Switch
+back to **Ask** and question them straight away. No command line, no restart.
+
+**Document purpose is required.** Describe what the files are for before
+uploading — it is stored in Postgres alongside the file name, your username and
+the upload date, and it is what the administrator sees in *Manage documents*.
+
+| | |
+|---|---|
+| Accepted types | `.pdf` `.docx` `.txt` `.md` `.markdown` `.log` `.csv` `.xlsx` `.xlsm` |
+| Size limit | 25 MB per file |
+| Files per upload | 20 |
+| Purpose | Required |
+| Re-uploading the same name | **Replaces** it — old chunks are deleted first |
+
+Each file is reported independently as **Ingested**, **Skipped** (wrong type,
+empty, or too large) or **Failed**, so one bad PDF never costs you the rest of
+the batch.
+
+### Adding documents from the command line
+
+Copying files into `data/` yourself does **not** update the index — nothing
+watches the folder. Re-run ingestion afterwards:
 
 | What changed | Command |
 |---|---|
@@ -439,6 +563,10 @@ curl http://localhost:8001/api/health
 curl -X POST http://localhost:8001/api/ask \
   -H "Content-Type: application/json" \
   -d "{\"question\": \"How do I configure connection pooling?\"}"
+
+# upload documents — saved to data/ AND ingested in the same request
+curl -X POST http://localhost:8001/api/upload \
+  -F "files=@notes.md" -F "files=@spec.pdf"
 ```
 
 ---

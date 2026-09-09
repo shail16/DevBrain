@@ -25,9 +25,89 @@ from dotenv import load_dotenv
 # them from.
 PROJECT_ROOT = Path(__file__).resolve().parent
 
-# `override=False` means real environment variables win over the .env file,
-# which is what you want in Docker/CI later on.
-load_dotenv(PROJECT_ROOT / ".env", override=False)
+# --------------------------------------------------------------------------- #
+#  Where configuration comes from
+#
+#  APPLICATION (ENVIRONMENT) VARIABLES ARE THE PRIMARY SOURCE.
+#
+#  Every setting below is read from the process environment. A `.env` file is
+#  an optional developer convenience that only fills in values the environment
+#  has not already supplied — it can never override a real variable.
+#
+#  Precedence, highest first:
+#    1. Real environment variables  (OS / container / CI / App Settings)
+#    2. .env file                   (optional, local development only)
+#    3. Built-in defaults           (non-secret values only)
+#
+#  Two escape hatches:
+#    DEVBRAIN_ENV_FILE       point at a different file instead of ./.env
+#    DEVBRAIN_IGNORE_ENV_FILE=1   ignore any .env entirely, environment only
+# --------------------------------------------------------------------------- #
+
+# Captured BEFORE the .env file is read, so we can report which source each
+# value actually came from. Purely diagnostic, but it turns "why is it using
+# the wrong key?" from guesswork into a one-line answer.
+_ENVIRONMENT_AT_STARTUP: frozenset[str] = frozenset(os.environ)
+
+ENV_FILE = Path(os.getenv("DEVBRAIN_ENV_FILE") or (PROJECT_ROOT / ".env"))
+IGNORE_ENV_FILE = (os.getenv("DEVBRAIN_IGNORE_ENV_FILE") or "").strip().lower() in (
+    "1", "true", "yes", "y", "on",
+)
+
+# `override=False` is what enforces the precedence above: a real environment
+# variable is never replaced by a value from the file.
+ENV_FILE_LOADED = False
+if not IGNORE_ENV_FILE and ENV_FILE.is_file():
+    load_dotenv(ENV_FILE, override=False)
+    ENV_FILE_LOADED = True
+
+
+def value_source(name: str) -> str:
+    """
+    Report where a setting's value came from: "environment", ".env" or "default".
+
+    Used by the start-up banner and /api/config so configuration problems are
+    diagnosable without printing any secret.
+    """
+    if name in _ENVIRONMENT_AT_STARTUP:
+        return "environment"
+    if name in os.environ:
+        return ".env" if ENV_FILE_LOADED else "environment"
+    return "default"
+
+
+def config_sources() -> dict[str, str]:
+    """Source of every setting DevBrain reads. Names only — never values."""
+    return {name: value_source(name) for name in SETTING_NAMES}
+
+
+# Every variable the application understands, grouped for reporting.
+SECRET_NAMES: tuple[str, ...] = (
+    "OPENAI_API_KEY",
+    "COHERE_API_KEY",
+    "LANGSMITH_API_KEY",
+    "ADMIN_PASSWORD",
+)
+
+SETTING_NAMES: tuple[str, ...] = SECRET_NAMES + (
+    "OPENAI_MODEL",
+    "OPENAI_TEMPERATURE",
+    "COHERE_EMBED_MODEL",
+    "LANGSMITH_TRACING",
+    "LANGSMITH_PROJECT",
+    "LANGSMITH_ENDPOINT",
+    "DATABASE_URL",
+    "COLLECTION_NAME",
+    "DATA_DIR",
+    "CHUNK_SIZE",
+    "CHUNK_OVERLAP",
+    "RETRIEVER_K",
+    "RETRIEVER_SCORE_THRESHOLD",
+    "API_PORT",
+    "ADMIN_USERNAME",
+    "ADMIN_FULL_NAME",
+    "ADMIN_EMAIL",
+)
 
 
 class ConfigError(RuntimeError):
@@ -165,13 +245,19 @@ def _build_settings() -> Settings:
     # unset. In Docker, Kubernetes and CI the settings arrive as real
     # environment variables and no .env file exists at all — treating that as an
     # error would make the app impossible to containerise.
-    if problems and not (PROJECT_ROOT / ".env").exists():
+    # Tested against ENV_FILE_LOADED, not merely whether a file exists: with
+    # DEVBRAIN_IGNORE_ENV_FILE set, a .env on disk is deliberately not read, and
+    # the advice must reflect what the app actually consulted.
+    if problems and not ENV_FILE_LOADED:
         problems.insert(
             0,
-            "No .env file found. Copy .env.example to .env and add your API keys:\n"
-            "        copy .env.example .env        (Windows)\n"
-            "        cp .env.example .env          (macOS/Linux)\n"
-            "    (Or supply these as environment variables, e.g. in Docker.)",
+            "No configuration source was read. Supply these as application\n"
+            "    (environment) variables — the recommended route:\n"
+            "        $env:OPENAI_API_KEY = 'sk-...'      PowerShell, this session only\n"
+            "        .\\set-env.ps1                       PowerShell, saved permanently\n"
+            "        export OPENAI_API_KEY=sk-...        macOS / Linux\n"
+            "    ...or, for local development only, copy .env.example to .env:\n"
+            "        copy .env.example .env",
         )
 
     if problems:

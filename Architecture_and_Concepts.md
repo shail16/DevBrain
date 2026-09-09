@@ -20,7 +20,8 @@ project and know why each line is there.
 10. [Design decisions and trade-offs](#10-design-decisions-and-trade-offs)
 11. [Two bugs this design had to solve](#11-two-bugs-this-design-had-to-solve)
 12. [Deployment architecture](#12-deployment-architecture)
-13. [Glossary](#13-glossary)
+13. [Authentication and access control](#13-authentication-and-access-control)
+14. [Glossary](#14-glossary)
 
 ---
 
@@ -1011,7 +1012,89 @@ deployment far less precious than it first appears.
 
 ---
 
-## 13. Glossary
+## 13. Authentication and access control
+
+### Three tables
+
+    devbrain_users      one row per account; password stored ONLY as a bcrypt hash
+    devbrain_sessions   one row per active login, so a session can be revoked
+    devbrain_documents  who uploaded which file, when, and what it is for
+
+### Why sessions, not JWTs
+
+The requirement is that deleting a user stops them working **immediately**. A
+JWT is self-contained and stays valid until it expires, so a deleted user would
+keep working for the rest of the token's lifetime unless you build a revocation
+list — at which point you have a session table anyway, plus a second mechanism
+to keep in sync.
+
+A session row is JOINed against the user on every request:
+
+```sql
+SELECT u.* FROM devbrain_sessions s
+JOIN devbrain_users u ON u.id = s.user_id
+WHERE s.token_hash = :t AND s.expires_at > now() AND u.is_active
+```
+
+Delete the user and `ON DELETE CASCADE` takes their sessions with them, so the
+row simply stops resolving on the very next request.
+
+### Why the token is hashed in the database
+
+Only `sha256(token)` is stored. If the database is ever dumped or leaked, the
+raw tokens are not in it, so nobody can resume a live session from a backup.
+The same reasoning that applies to passwords applies to session tokens.
+
+### Why passwords are SHA-256'd before bcrypt
+
+bcrypt silently ignores everything past 72 **bytes**, which would make two
+different long passwords interchangeable. Pre-hashing collapses any length into
+a fixed 64-character digest, so the whole password always contributes.
+
+The bcrypt cost factor is 12: slow enough that brute-forcing a stolen hash is
+impractical, fast enough (~250 ms) that signing in feels instant.
+
+### Why the cookie is HttpOnly
+
+JavaScript cannot read an HttpOnly cookie, so an XSS bug cannot steal the
+session — the main reason to prefer a cookie over `localStorage` here.
+`SameSite=lax` allows ordinary navigation while blocking cross-site form posts.
+
+Set `secure=True` on the cookie once you put the app behind HTTPS.
+
+### Why login errors are deliberately vague
+
+Every failure path returns the same "Incorrect username or password". Telling an
+attacker whether the username exists hands them a way to enumerate accounts. The
+code also runs a dummy bcrypt verification when the user is missing, so response
+time cannot distinguish the two cases either.
+
+### Hiding a tab is not security
+
+The admin tabs are hidden client-side for usability only. Every `/api/admin/*`
+route independently re-checks the session and the `is_admin` flag server-side,
+so a curious user editing the DOM gains nothing. **Authorisation always belongs
+on the server**; the UI is a convenience on top of it.
+
+### Attribution flows through the vector store
+
+`uploaded_by` and `uploaded_at` are written into each chunk's `cmetadata` at
+ingestion time. Because that metadata travels with the chunk into pgvector, it
+comes back attached to every retrieved document — so the API can show who
+contributed a source without a second lookup. `devbrain_documents` remains the
+authoritative registry for the admin view.
+
+### Administrators can only be seeded
+
+`ensure_admin()` reads `ADMIN_USERNAME` / `ADMIN_PASSWORD` and creates the
+account if it is missing. `POST /api/auth/register` hardcodes `is_admin=False`,
+so there is no code path by which a self-registered user becomes an
+administrator. Seeding never *updates*, so a password changed in the app is not
+reverted on the next restart.
+
+---
+
+## 14. Glossary
 
 **Chunk** — a small piece of a document (~1000 characters here), the unit that
 gets embedded and retrieved.
