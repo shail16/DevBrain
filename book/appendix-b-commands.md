@@ -1,5 +1,7 @@
 # Appendix B — Command Reference
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 Every command in the book, in one place.
 
 All Python commands assume `(.venv)` is active and you are in the project folder.

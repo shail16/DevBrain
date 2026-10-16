@@ -1,5 +1,7 @@
 # DevBrain from Scratch
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ### Building a Private AI Knowledge Base with RAG, FastAPI and pgvector
 
 ---

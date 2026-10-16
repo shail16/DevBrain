@@ -1,5 +1,7 @@
 # Chapter 1 — What DevBrain Is, and Why It Exists
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 1.1 The problem, stated plainly

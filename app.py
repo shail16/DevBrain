@@ -739,7 +739,7 @@ def ask(request: AskRequest, user: auth.User = Depends(current_user)) -> AskResp
                 question=question,
                 answer=(
                     "The knowledge base is empty, so I have nothing to search.\n\n"
-                    "Add documents (.txt, .md, .pdf, .docx, .xlsx) to the `data` "
+                    "Add documents (.txt, .md, .pdf, .docx, .xlsx, .html, .jpg, .png, .gif) to the `data` "
                     "folder, then run:\n\n"
                     "```\npython ingest.py\n```"
                 ),

@@ -1,5 +1,7 @@
 # Chapter 17 — Observability with LangSmith
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 17.1 Why RAG needs this more than most systems

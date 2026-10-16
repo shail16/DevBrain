@@ -1,8 +1,26 @@
 # DevBrain — Architecture and Concepts
 
-A beginner-friendly deep dive. No prior AI experience assumed. By the end you
-should be able to explain every box in the diagram, and to open any file in this
-project and know why each line is there.
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
+### The problem this document describes a solution to
+
+Engineering knowledge accumulates across many disconnected places — internal
+notes, PDFs, spreadsheets of decisions, Word documents, exported logs — and in
+many different formats and sources. Nobody reliably remembers where a given
+fact lives, and a plain keyword search misses anything phrased differently
+from the original note.
+
+**DevBrain's agenda is to consume that knowledge base — notes and documents
+from different sources and of different types (`.txt`, `.md`, `.pdf`,
+`.docx`, `.xlsx`, `.csv`, `.log`) — as defined in the project scope, index it
+once, and answer questions grounded in it on demand.** When a user asks the
+system for help — including help with code, configuration, or a snippet that
+exists somewhere in the ingested material — DevBrain retrieves the exact
+passage that answers it and returns that content (code included) rather than
+guessing from general knowledge.
+
+This document explains how that pipeline is built: every component involved,
+why each technology was chosen, and how the system is architected end to end.
 
 ---
 
@@ -21,7 +39,8 @@ project and know why each line is there.
 11. [Two bugs this design had to solve](#11-two-bugs-this-design-had-to-solve)
 12. [Deployment architecture](#12-deployment-architecture)
 13. [Authentication and access control](#13-authentication-and-access-control)
-14. [Glossary](#14-glossary)
+14. [Component & service architecture reference](#14-component--service-architecture-reference)
+15. [Glossary](#15-glossary)
 
 ---
 
@@ -1094,7 +1113,338 @@ reverted on the next restart.
 
 ---
 
-## 14. Glossary
+## 14. Component & Service Architecture Reference
+
+This section is the professional-reference view of the system: every moving
+part DevBrain is built from, why it was chosen, and the specific technical
+concepts it brings into the project. Read §§1–13 for the *story* of why RAG
+works this way; read this section as the *inventory* you would hand to a new
+engineer, an architect doing a design review, or an auditor.
+
+### 14.1 Architecture style
+
+DevBrain is a **modular monolith**, not a microservice mesh: one Python
+process (`app.py`) serves the API and UI, backed by one relational database
+that also serves as the vector store, and it calls out to external
+best-of-breed AI providers rather than hosting models itself.
+
+| Architectural property | Choice made | Rationale |
+|---|---|---|
+| **Process topology** | Single FastAPI process, multiple internal modules | A knowledge base for one team does not need distributed-systems complexity; a modular monolith keeps transactions, deployment and debugging simple |
+| **Data topology** | One PostgreSQL instance holds relational rows (users, sessions, documents) *and* vector embeddings | Avoids a second database, a second backup strategy and a second failure domain purely for vectors |
+| **AI topology** | Embeddings and generation are both **externalised** (Cohere, OpenAI) rather than self-hosted | No GPU infrastructure to operate; pay-per-call instead of always-on inference cost |
+| **Integration style** | Synchronous REST over HTTP/JSON between browser and API; synchronous SQL/HTTPS between API and its dependencies | Simplicity and traceability over throughput — appropriate at this scale |
+| **Composition style** | LangChain **Runnables** composed with the `\|` operator (LCEL) inside the process | Gets structured, automatically-traced pipeline composition without hand-rolled plumbing |
+
+### 14.2 Full component & service inventory
+
+| # | Component / Service | Category | Purpose | Core technical concepts it embodies |
+|---|---|---|---|---|
+| 1 | `app.py` | Application service (FastAPI) | HTTP entry point: serves the UI, authentication, uploads, health/config, and the `/api/ask` RAG endpoint | ASGI, dependency injection, request/response schema validation, lifespan hooks, middleware |
+| 2 | `ingest.py` | Batch/CLI process | Discovers, parses, chunks, embeds and stores documents from `/data` | Idempotent batch processing, deterministic hashing, CLI argument parsing |
+| 3 | `rag.py` | Shared domain module | Defines the embedding client, vector store handle, LLM client, prompt template and the LCEL retrieval-augmented-generation chain | Factory functions, prompt engineering, pipeline composition (LCEL), dependency inversion |
+| 4 | `loaders.py` | Domain module | Converts heterogeneous files (PDF, DOCX, XLSX, plain text) into a uniform `Document` representation | Format-specific parsing, encoding-fallback strategies, data normalisation |
+| 5 | `db.py` | Infrastructure module | Direct SQL access for health checks, chunk counts and deletions | Connection pooling, engine caching, parameterised queries |
+| 6 | `auth.py` | Domain/security module | User accounts, password hashing, session issuance/validation, document ownership registry | Password hashing (bcrypt), server-side session management, least-privilege authorisation |
+| 7 | `config.py` | Infrastructure module | Single source of truth for all runtime configuration; validates and fails fast | Twelve-factor configuration, environment-variable precedence, immutable settings object |
+| 8 | `index.html` | Presentation layer | Dependency-free browser UI: chat interface, health banner, admin views | Progressive enhancement, output escaping (XSS defence), Fetch API |
+| 9 | **devbrain-app** (Docker service) | Compute service | Runs the FastAPI application inside a container, behind the `full` Compose profile | Containerisation, non-root execution, process supervision, multi-stage builds |
+| 10 | **devbrain-postgres** (Docker service) | Data service | PostgreSQL 17 with the `pgvector` extension — the single system of record for relational *and* vector data | Relational database (ACID), vector similarity search, extension mechanism, persistent volumes |
+| 11 | **devbrain-pgadmin** (Docker service) | Operations tooling | Web-based SQL client for inspecting the database without leaving the browser | Database administration UI, desktop-mode auth bypass (local-only) |
+| 12 | **Cohere** (external API) | AI service — embeddings | Converts text into 1024-dimension vectors, identically for stored chunks and live questions | Dense vector embeddings, asymmetric query/document encoding, batch-limited REST APIs |
+| 13 | **OpenAI** (external API) | AI service — generation | Reads the retrieved context and writes a fluent, grounded natural-language answer | Large language models, prompt-conditioned generation, temperature/sampling control, token-based billing |
+| 14 | **LangSmith** (external API, optional) | Observability service | Captures a structured trace of every step in every RAG run | Distributed tracing, callback/event hooks, span hierarchies |
+| 15 | **LangChain / LCEL runtime** | Framework layer (in-process) | Provides the `Document` type, text splitter, vector-store adapter and the Runnable composition model | Composable pipelines, the Runnable protocol (`invoke`/`stream`/`batch`), automatic instrumentation |
+| 16 | **Docker Compose** | Orchestration tooling | Declares and wires the multi-container topology for both development and production modes | Service discovery via embedded DNS, named volumes, healthcheck-gated startup, deployment profiles |
+
+### 14.3 Service deep-dives
+
+Each subsection below answers three questions for one service: **what it is**,
+**why DevBrain needs it specifically**, and **which technical concepts a
+reader should understand to reason about it**.
+
+#### FastAPI application service
+
+- **What**: an ASGI web framework hosting DevBrain's entire HTTP surface —
+  UI, auth, uploads, health, and the RAG endpoint.
+- **Why this and not Flask/Django**: native async support, automatic request
+  validation and OpenAPI documentation from Python type hints (Pydantic), and
+  a dependency-injection system (`Depends`) that keeps auth checks declarative
+  rather than duplicated in every handler.
+- **Concepts in play**:
+  - **ASGI** (Asynchronous Server Gateway Interface) — the protocol between
+    the web server (Uvicorn) and the application; lets synchronous handlers
+    run in a worker thread without blocking the event loop (see §11, Bug 2).
+  - **Pydantic models** — declarative request/response schemas that validate
+    and coerce incoming JSON before a single line of business logic runs.
+  - **Dependency injection** — `Depends(current_user)` / `Depends(current_admin)`
+    resolve and authorise the caller once, shared across every protected route.
+  - **Lifespan events** — `@asynccontextmanager` startup/shutdown hooks used
+    to load configuration once per process, without blocking the app from
+    booting if configuration is broken.
+  - **CORS middleware** — explicitly permissive here because the deployment
+    boundary is `localhost`; the trade-off is documented in §12.
+
+#### PostgreSQL + pgvector data service
+
+- **What**: a single relational database that stores user accounts, sessions,
+  the document registry, **and** the vector index — via the `pgvector`
+  extension.
+- **Why this and not a dedicated vector database**: one engine, one backup
+  policy, one connection pool, one access-control model, and the ability to
+  `JOIN` a similarity search against ordinary relational tables. See §4 for
+  the full trade-off analysis against Pinecone/Weaviate/Chroma.
+- **Concepts in play**:
+  - **ACID transactions** — inserts, deletes and upserts of chunks are
+    transactional, so a failed batch cannot half-write a document.
+  - **Extension mechanism** — `CREATE EXTENSION vector` adds a new column
+    type (`vector(n)`) and new distance operators (`<=>`, `<->`, `<#>`)
+    without forking Postgres itself.
+  - **JSONB with GIN indexing** — chunk metadata (`source`, `page`,
+    `chunk_index`, `uploaded_by`) is stored as indexed semi-structured data,
+    combining schema flexibility with query performance.
+  - **Exact vs. approximate nearest-neighbour search** — DevBrain runs an
+    exact sequential scan today; HNSW/IVFFlat indexes are the documented
+    upgrade path once chunk volume passes roughly 100k rows (§4, §10).
+  - **Connection pooling** (`pool_pre_ping`, `pool_recycle`) — keeps
+    long-lived connections healthy across idle periods instead of surfacing
+    "server closed the connection unexpectedly" errors.
+
+#### pgAdmin operations service
+
+- **What**: a web UI for browsing and querying PostgreSQL directly.
+- **Why**: makes the "your data is not a black box" property of §4 concrete —
+  anyone can open a browser and run the exact SQL this document shows.
+- **Concepts in play**: database administration tooling; desktop-mode
+  authentication bypass, which is safe only because the whole stack assumes a
+  single trusted `localhost` operator (§12).
+
+#### Cohere embedding service
+
+- **What**: a hosted API that turns text into a fixed-length numeric vector
+  capturing semantic meaning (`embed-english-v3.0`, 1024 dimensions).
+- **Why an external API instead of a local model**: embedding models are
+  cheap and fast to call remotely, avoid a GPU dependency, and Cohere's v3
+  models offer asymmetric query/document modes tuned specifically for
+  retrieval, which a generic local model would not provide out of the box.
+- **Concepts in play**:
+  - **Dense vector embeddings** — meaning encoded as coordinates in a
+    high-dimensional space (§3).
+  - **Cosine similarity** — the distance metric used to compare vectors,
+    robust to differences in text length (§3, §4).
+  - **Asymmetric encoding** (`search_document` vs. `search_query`) —
+    documents and questions are embedded with different internal modes so
+    that a question's vector lands near the passages that *answer* it, not
+    merely passages that *repeat* it.
+  - **Batch-limited REST APIs** — the 96-text-per-call ceiling is a real
+    constraint the ingestion engine designs around (§6).
+
+#### OpenAI generation service
+
+- **What**: a hosted large language model (`gpt-4o-mini` by default) that
+  converts a prompt containing retrieved context into a written answer.
+- **Why an external API instead of a local model**: generation quality at
+  this scale currently favours hosted frontier models; the cost is paid only
+  per question asked, not per hour of GPU uptime.
+- **Concepts in play**:
+  - **Prompt-conditioned generation** — the model's only source of facts is
+    the `{context}` block assembled by `format_documents()`; this is what
+    makes an answer "grounded" rather than freely generated (§1, §8).
+  - **Temperature / sampling control** — `temperature=0.0` makes output
+    deterministic, appropriate for factual retrieval rather than creative
+    writing (§10).
+  - **Token-based billing and context limits** — the reason documents are
+    chunked before being pasted into a prompt at all (§5).
+
+#### LangSmith observability service
+
+- **What**: a hosted tracing platform that records the inputs, outputs,
+  latency and cost of every step of every RAG run.
+- **Why**: without it, a wrong answer is a black box — with it, every
+  retrieval and every generation call is individually inspectable (§9).
+- **Concepts in play**:
+  - **Distributed tracing** — a tree of timed spans representing one
+    logical operation (`DevBrainRAG`) broken into its constituent steps.
+  - **Callback/event hooks** — every LangChain `Runnable` emits
+    `on_start`/`on_end`/`on_error` events; the tracer is just a listener
+    attached once tracing environment variables are set (§9).
+  - **Non-blocking instrumentation** — traces ship to LangSmith on a
+    background thread so observability never adds latency to the user-facing
+    response.
+
+#### LangChain / LCEL runtime
+
+- **What**: the in-process framework supplying the `Document` type, the
+  recursive text splitter, the `PGVector` store adapter, and LCEL — the
+  `|`-based composition syntax used to build the RAG chain.
+- **Why this much LangChain and no more**: DevBrain deliberately uses only
+  the parts that "pay for themselves" — a shared document type, a
+  well-tested splitter, a maintained Postgres/pgvector adapter, and
+  automatic tracing from Runnable composition — while avoiding heavier
+  abstractions like agents or memory objects that this project does not need
+  (§7).
+- **Concepts in play**:
+  - **The Runnable protocol** — a uniform interface (`invoke`, `stream`,
+    `batch`) that lets retriever, prompt and LLM all compose with the same
+    `|` operator.
+  - **Declarative pipeline composition (LCEL)** — the chain reads as data
+    flow, not imperative control flow, which is what makes each stage
+    independently traceable (§8, §9).
+
+#### Docker & Docker Compose orchestration
+
+- **What**: containerises the application and its database dependency, and
+  declares how they are networked, healthchecked and started.
+- **Why**: makes the entire stack reproducible on any machine, and supports
+  two topologies (host development vs. fully containerised) from one
+  `docker-compose.yml` (§12).
+- **Concepts in play**:
+  - **Multi-stage builds** — compilers and build headers never reach the
+    runtime image, shrinking it and reducing attack surface.
+  - **Service discovery via embedded DNS** — containers reach each other by
+    service name (`postgres`), not `localhost`, because each container has
+    its own network namespace.
+  - **Named volumes** — `devbrain_pgdata` persists database state across
+    container recreation without persisting it inside the image.
+  - **Healthcheck-gated startup** (`condition: service_healthy`) — the app
+    container waits for Postgres to be *query-ready*, not merely
+    TCP-reachable, before Compose considers the dependency satisfied.
+  - **Compose profiles** — the `full` profile toggles whether the app itself
+    runs containerised, without maintaining a second compose file.
+  - **Twelve-factor config injection** — secrets arrive via `env_file` and
+    environment variables at *run* time, never baked into an image layer.
+
+### 14.4 Cross-cutting technical concerns
+
+These concepts are not owned by any single component — they are properties
+of the system as a whole, and every service above contributes to them.
+
+| Concern | How DevBrain addresses it | Where in this document |
+|---|---|---|
+| **Security** | bcrypt-hashed passwords, hashed session tokens, `HttpOnly`/`SameSite` cookies, server-side session revocation, path-traversal defence on uploads, server-side re-checked admin authorisation | §13 |
+| **Observability** | LangSmith tracing of every retrieval/generation step; structured, actionable error translation in `app.py` (`_explain_failure`) and `ingest.py` (`explain_ingestion_failure`) | §9, §8 |
+| **Reliability** | Lazy, cached pipeline construction that never crashes the process on a missing dependency; `/api/health` reports the *specific* broken layer; Docker healthchecks gate traffic | §8, §12 |
+| **Idempotency** | Deterministic, content-hashed chunk IDs make re-running ingestion an upsert, not a duplication | §6, §11 |
+| **Data integrity** | Foreign keys with `ON DELETE CASCADE` (sessions, documents) keep relational state consistent when a user is removed | §13 |
+| **Portability** | All configuration is environment-driven (twelve-factor); the same application image runs unmodified in development and production | §12 |
+| **Cost control** | Embedding and generation are billed per call, not per hour; batching, preflight checks and a strict token budget (via chunking) keep spend predictable | §5, §6, §7 |
+| **Extensibility** | Small, single-purpose modules (`loaders.py`, `rag.py`, `db.py`) with narrow responsibilities, documented upgrade paths (HNSW indexing, reranking, hybrid search, streaming) | §8, §10 |
+
+### 14.5 Chunking strategy, search mechanism & accuracy assurance
+
+This subsection names, precisely, the *category* of technique DevBrain uses
+at each stage — the terminology an architecture review or a technical
+interview would expect — and explains exactly how correctness is protected
+at every step.
+
+#### A. Chunking strategy: recursive, structure-aware, fixed-size-with-overlap
+
+Chunking strategies generally fall into four families:
+
+| Family | How it decides where to cut | Used by DevBrain? |
+|---|---|---|
+| **Fixed-size chunking** | Cuts every *N* characters/tokens, ignoring content | No — too crude on its own; would slice sentences and code blocks in half |
+| **Recursive / structure-aware chunking** ← *this project* | Tries structural boundaries first (headings, code fences, paragraphs) and only falls back to a hard cut as a last resort | **Yes** |
+| **Semantic chunking** | Uses embedding similarity between sentences to find natural topic breaks | No — adds an embedding call per split decision; unnecessary at this project's scale |
+| **Document-structure chunking (layout-aware)** | Splits along a format's own structure (Markdown AST, HTML DOM, PDF layout) | Partially — PDF is split per page and Excel per worksheet before the recursive splitter ever runs (`loaders.py`) |
+
+DevBrain's implementation is LangChain's **`RecursiveCharacterTextSplitter`**,
+configured as a **priority-ordered separator cascade** — this is the
+technically precise name for the `separators=[...]` list in `ingest.py`
+(§5, §6). It is recursive in the literal sense: the splitter recurses into a
+piece of text with the *next* separator in the list only when the piece is
+still larger than `chunk_size` after trying the current one.
+
+| Parameter | Value | Purpose |
+|---|---|---|
+| `chunk_size` | 1000 characters | Upper bound on a chunk before it is considered "too big" |
+| `chunk_overlap` | 150 characters (15%) | Duplicated tail/head between consecutive chunks so a boundary never fully severs one idea |
+| Separator priority | `\n## ` → `\n### ` → `` \n``` `` → `\n\n` → `\n` → `. ` → `' '` → `''` | Cuts at the *most meaningful* boundary available; a single character is the last resort |
+| Length function | `len()` (character count) | Simple, fast, predictable — no tokenizer dependency at split time |
+| Chunk ID | `sha256(collection \| source \| chunk_index \| text)` | Makes chunking **content-addressed and idempotent**, not just size-based |
+
+**Why this family was chosen over semantic chunking**: semantic chunking
+would call the embedding model once per candidate boundary to compare
+sentence similarity, multiplying ingestion cost and latency for a benefit
+that only matters at much larger, more heterogeneous corpora. Structure-aware
+recursive chunking gets most of the same benefit — chunks that respect
+natural document boundaries — at a fixed, predictable cost.
+
+#### B. Search mechanism: dense vector k-NN similarity search (exact, not approximate)
+
+DevBrain's retrieval is **semantic search**, not keyword search — precisely,
+it is **dense-vector k-nearest-neighbour (k-NN) similarity search**. Contrast
+with the alternatives:
+
+| Search family | Matches on | Used by DevBrain? |
+|---|---|---|
+| **Lexical / keyword search** (e.g. TF-IDF, BM25, Postgres full-text `tsvector`) | Shared words/stems between query and document | No (documented as a future *hybrid search* upgrade in §10) |
+| **Dense vector similarity search** ← *this project* | Distance between embedding vectors in 1024-dimensional space | **Yes** |
+| **Hybrid search** | Combines lexical and vector scores | Not implemented; listed as a scale-up option in §10 |
+| **Reranking** (cross-encoder over a candidate set) | Re-scores an initial retrieval set with a more expensive, more accurate model | Not implemented; listed as a scale-up option in §10 |
+
+Concretely, the pipeline is:
+
+1. **Encode** — the question is embedded with Cohere in `search_query` mode
+   (`build_embeddings()` in `rag.py`), producing the same 1024-dimension space
+   the stored chunks live in.
+2. **Retrieve** — `VectorStoreRetriever` (LangChain's wrapper around
+   `PGVector.as_retriever()`) issues a SQL query using pgvector's cosine
+   operator:
+
+   ```sql
+   SELECT document, cmetadata
+   FROM langchain_pg_embedding
+   ORDER BY embedding <=> :question_vector
+   LIMIT :k;
+   ```
+
+3. **Rank** — results are ordered purely by cosine distance, ascending
+   (closest meaning first).
+4. **Cut off** — the top `RETRIEVER_K` (default **4**) chunks are kept, and,
+   when `RETRIEVER_SCORE_THRESHOLD` is set above `0`, LangChain switches the
+   retriever's `search_type` from `"similarity"` to
+   `"similarity_score_threshold"` (`build_retriever()` in `rag.py`), which
+   additionally **discards** any chunk below the threshold — even if that
+   means returning fewer than `k` results.
+
+**Exact, not approximate**: because no HNSW/IVFFlat index is built yet
+(§4, §10), every search is a full sequential scan that compares the query
+vector against *every* stored embedding. This is deliberately traded for
+100% recall — the true nearest neighbours are always found, with zero
+approximation error — which is affordable below roughly 100,000 chunks and
+is the documented threshold at which an approximate index becomes worthwhile.
+
+#### C. How search accuracy is assured
+
+Accuracy in a RAG system has two independent failure points — the wrong
+chunks are retrieved, or the right chunks are retrieved but answered badly —
+and DevBrain has a specific mechanism for each:
+
+| Mechanism | What it protects against | How it works |
+|---|---|---|
+| **Cosine similarity as the distance metric** | Vector length (verbosity) being mistaken for relevance | Measures the *angle* between vectors, not their magnitude — a short question and a long answering paragraph can still score highly if they point the same direction (§3) |
+| **Asymmetric query/document embeddings** | Literal-repetition bias | Cohere v3's `search_query` vs `search_document` modes place a question near the passages that *answer* it, not merely passages that restate it (§3, §7) |
+| **One shared embedding model across both pipelines** | Vector-space mismatch ("ingestion succeeded, search finds nothing") | `rag.py`'s `build_embeddings()` is the single factory both `ingest.py` and `app.py` call — there is no code path where they could disagree (§2, §8) |
+| **Score threshold filtering** (`RETRIEVER_SCORE_THRESHOLD`) | Confidently-worded but irrelevant chunks polluting the answer | Chunks below the configured cosine score are dropped before they ever reach the prompt, even if it leaves fewer than `k` results |
+| **Exact (non-approximate) nearest-neighbour search** | Recall loss from an approximate index's speed/accuracy trade-off | A full sequential scan guarantees the mathematically closest chunks are always the ones returned, at this project's current data volume |
+| **Deterministic, content-hashed chunk IDs** | Stale or duplicated chunks skewing results | Editing or deleting a document produces new IDs / a `DELETE`, so retrieval never surfaces content that no longer exists on disk (§6, §11) |
+| **Context-preserving chunk construction** | Losing the fact that makes a chunk matchable at all | Overlap prevents boundary-cut sentences (§5); Excel rows repeat their column header so a mid-sheet chunk is still interpretable out of context (§8) |
+| **Grounding rules in the prompt** | The LLM inventing an answer when retrieval found nothing relevant | The system prompt requires a fixed refusal line when the context does not contain the answer — a *generation-side* backstop for retrieval misses (§1, §7) |
+| **Sources returned separately from the answer** | Trusting the model's own citations | The `sources` array in the API response is built from the `docs` the retriever *actually* returned, not from the LLM's bracketed footnotes, so it is independently verifiable (§6, §10) |
+| **LangSmith tracing** | Accuracy problems being undiagnosable | Every retrieval span records the exact chunks and scores returned for a given question, separating "wrong chunks retrieved" from "right chunks, weak answer" (§9) |
+
+The measured effect of this design is the score gap shown in §3: on-topic
+questions in this project's sample data score roughly **0.45–0.55** cosine
+similarity against their best-matching chunk, while an unrelated question
+("What is the capital of France?") collapses to roughly **0.11** — a gap
+wide enough that `RETRIEVER_SCORE_THRESHOLD` can be set to reliably separate
+"answerable from your documents" from "not in your knowledge base" without
+manual tuning per query.
+
+---
+
+## 15. Glossary
 
 **Chunk** — a small piece of a document (~1000 characters here), the unit that
 gets embedded and retrieved.

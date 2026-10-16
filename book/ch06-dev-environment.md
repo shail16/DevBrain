@@ -1,5 +1,7 @@
 # Chapter 6 — The Development Environment
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 6.1 What we are setting up, and why in this order

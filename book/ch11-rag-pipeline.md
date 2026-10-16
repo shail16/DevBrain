@@ -1,5 +1,7 @@
 # Chapter 11 — The RAG Pipeline
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 11.1 The smallest important file

@@ -1,5 +1,7 @@
 # Chapter 15 — Users, Documents and the Admin Console
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 15.1 What ownership adds

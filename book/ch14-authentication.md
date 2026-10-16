@@ -1,5 +1,7 @@
 # Chapter 14 — Authentication and Sessions
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 14.1 The requirements

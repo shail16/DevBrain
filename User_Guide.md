@@ -1,5 +1,7 @@
 # DevBrain — User Guide
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 A complete, step-by-step manual. Follow it top to bottom the first time; after
 that you will only ever need Part 5 (daily use).
 
@@ -11,7 +13,7 @@ download images.
 ## Contents
 
 1. [What you need before you start](#1-what-you-need-before-you-start)
-2. [Get your three API keys](#2-get-your-three-api-keys)
+2. [Get your API keys and admin account](#2-get-your-api-keys-and-admin-account)
 3. [One-time setup](#3-one-time-setup)
 4. [First run](#4-first-run)
 5. [Daily use](#5-daily-use)
@@ -35,6 +37,7 @@ download images.
 | **An OpenAI API key** | Writes the answers | See Part 2 |
 | **A Cohere API key** | Turns text into vectors | See Part 2 |
 | **A LangSmith API key** | Records traces (optional) | See Part 2 |
+| **An administrator username/password** | First account that can manage users and documents | See [Part 2 — Administrator account](#administrator-account-not-an-external-key) |
 
 > **Docker Desktop must actually be running**, not merely installed. On Windows,
 > launch it from the Start menu and wait until the whale icon in the system tray
@@ -56,10 +59,10 @@ You can change all three in `.env` — see [Troubleshooting](#port-is-already-al
 
 ---
 
-## 2. Get your three API keys
+## 2. Get your API keys and admin account
 
-Open each link, create a key, and keep the browser tab open — you will paste all
-three into one file in the next step.
+Open each link, create a key, and keep the browser tab open — you will supply
+all of them, plus an administrator username/password, in the next step.
 
 ### OpenAI (required — writes the answers)
 
@@ -78,7 +81,8 @@ three into one file in the next step.
 2. Copy your **Trial key** (created automatically when you sign up)
 
 > Trial keys are free and allow roughly 100 calls per minute — far more than
-> enough. Ingesting the six sample documents uses exactly **one** call.
+> enough. Ingesting the sample documents shipped in `data/` uses only a
+> handful of calls, well under the trial limit.
 
 ### LangSmith (optional — records traces)
 
@@ -88,6 +92,26 @@ three into one file in the next step.
 
 > You can skip this. Set `LANGSMITH_TRACING=false` in `.env` and everything else
 > works identically — you just lose the debugging view.
+
+### Administrator account (not an external key)
+
+DevBrain requires every user to sign in, including you. There is no key to
+fetch for this one — you just choose a username and password:
+
+| Setting | What it is |
+|---|---|
+| `ADMIN_USERNAME` | The first administrator's sign-in name (default `Shailendra.KS`) |
+| `ADMIN_PASSWORD` | Its password — **change this before running anywhere shared** |
+| `ADMIN_FULL_NAME` | Display name shown in the UI (optional) |
+| `ADMIN_EMAIL` | Optional, shown in **Manage users** |
+
+`.\set-env.ps1` (Part 3.1) prompts for `ADMIN_USERNAME` and `ADMIN_PASSWORD`
+alongside the three API keys, so you can set all four secrets in one pass.
+This account is **seeded**, not hard-coded: on the app's first request it is
+created in Postgres if it does not already exist, and only ever created —
+never overwritten — so changing `ADMIN_PASSWORD` later and restarting does
+not revert a password you changed inside the app. Only the bcrypt hash is
+ever stored; the plaintext never reaches the database.
 
 ---
 
@@ -109,6 +133,9 @@ Nothing is hard-coded, and the application never writes secrets to disk.
 It prompts for each key with masked input and saves them as Windows **user**
 environment variables, so they persist across reboots and are picked up by
 every terminal, VS Code and Docker Compose. No administrator rights needed.
+It also prompts for `ADMIN_USERNAME` / `ADMIN_PASSWORD` (the account seeded
+in Part 4.4) in the same pass, so one run of the script sets up every secret
+the app needs.
 
 ```powershell
 .\set-env.ps1 -Show     # which variables are set (values never shown)
@@ -238,8 +265,12 @@ Put your notes into the `data/` folder. DevBrain reads:
 
 Sub-folders are searched too, so `data/python/asyncio.md` works fine.
 
-Six sample documents ship with the project so you can test everything
-immediately. Delete them once you have added your own.
+A handful of sample/reference documents ship in `data/` so you can test
+everything immediately — a mix of PDFs (invoices, insurance policy details),
+Markdown/SQL notes, a CSS cheat sheet and reusable code snippets. Run
+`python ingest.py --stats` any time to see exactly what is currently indexed
+by filename. Delete the samples once you have added your own documents —
+`python ingest.py --reset` afterwards removes their chunks too.
 
 > **Scanned PDFs will not work.** If a PDF is a photo of a page, it holds no
 > text layer for DevBrain to read. Ingestion reports it as `empty`. You need OCR
@@ -252,40 +283,43 @@ python ingest.py
 ```
 
 This reads every file, splits it into chunks, sends them to Cohere for
-embeddings, and stores the results in PostgreSQL:
+embeddings, and stores the results in PostgreSQL. The shape of the output
+looks like this — your file names, counts and timings will differ depending
+on what is actually in `data/`:
 
 ```
 ======================================================================
 DevBrain ingestion
 ======================================================================
-Data folder      : C:\ClaudeCode Projects\DevBrain\data
+Data folder      : ****\DevBrain\data
 Database         : postgresql+psycopg://devbrain:****@localhost:5433/devbrain
 Collection       : devbrain_docs
 Embedding model  : embed-english-v3.0
 Chunk size       : 1000 chars (overlap 150)
 
 [1/4] Discovering files
-  found 6 file(s), 54.3 KB total
+  found 16 file(s), 3.8 MB total
 
 [2/4] Parsing documents
-  ok      code-review-standards.docx  (1 part(s), 1,854 chars)
-  ok      docker-tips.md  (1 part(s), 2,600 chars)
-  ok      incident-response-runbook.pdf  (2 part(s), 2,084 chars)
-  ok      postgres-best-practices.md  (1 part(s), 2,316 chars)
-  ok      python-async-notes.txt  (1 part(s), 2,641 chars)
-  ok      tech-stack-decisions.xlsx  (2 part(s), 1,963 chars)
-  extracted 8 document part(s)
+  ok      General_SQL.md  (1 part(s), 2,140 chars)
+  ok      RAG_Implementation_Guide.txt  (1 part(s), 3,015 chars)
+  ok      Telerik_Controls_Reusable_Code.txt  (1 part(s), 1,822 chars)
+  ok      CSS_Form_Controls_Cheat_Sheet-v2.pdf  (2 part(s), 2,910 chars)
+  ok      Invoice_1_ElectroWorld.pdf  (1 part(s), 640 chars)
+  ok      HDFC_Policy_Details.pdf  (4 part(s), 5,120 chars)
+  ...     (and the remaining files in data/)
+  extracted 38 document part(s)
 
 [3/4] Splitting into chunks
-  created 18 chunk(s), average 760 chars
+  created 61 chunk(s), average 710 chars
 
 [4/4] Embedding with Cohere and storing in pgvector
   checking Cohere credentials...
   Cohere OK
-  batch 1/1: 18/18 chunks stored (0.6s)
+  batch 1/1: 61/61 chunks stored (0.9s)
 
 ======================================================================
-Done. 18 chunk(s) from 6 file(s) in 1.4s.
+Done. 61 chunk(s) from 16 file(s) in 2.1s.
 ======================================================================
 ```
 
@@ -370,14 +404,18 @@ onto each chunk, so when an answer cites a document the UI shows
 
 Open <http://localhost:8001>.
 
-The status bar under the title should be **green**: `Ready — 18 chunks indexed`.
+The status bar under the title should be **green**:
+`Ready — N chunks indexed` (N depends on what is in your `data/` folder).
 
 Type a question and press **Enter**. With the sample documents, try:
 
-- *How do I stop database connections from going stale?*
-- *Which datastore should I use for caching sessions?*
-- *What do I do in the first 15 minutes of an outage?*
-- *How big should a pull request be?*
+- *What is the total amount due on the ElectroWorld invoice?*
+- *What does the HDFC policy document cover?*
+- *How do I write a basic JOIN in SQL, based on the notes provided?*
+- *How do I style a form control using the CSS cheat sheet?*
+
+Adjust these to whatever is actually in your `data/` folder — the point is
+to ask something your documents genuinely contain.
 
 Each answer appears with the **source files** it came from listed underneath.
 Always check them — that list is how you verify an answer instead of trusting it.
@@ -557,17 +595,49 @@ docker compose down -v          # remove containers AND delete all data
 
 The server publishes interactive docs at <http://localhost:8001/docs>.
 
+| Endpoint | Method | Auth required | Purpose |
+|---|---|---|---|
+| `/` | GET | No | Serves the browser UI |
+| `/api/health` | GET | No | Postgres/pgvector status and chunk count |
+| `/api/config` | GET | No | Non-secret settings currently in effect |
+| `/api/auth/register` | POST | No | Create a standard (non-admin) account and sign in |
+| `/api/auth/login` | POST | No | Sign in, issuing the session cookie |
+| `/api/auth/logout` | POST | Yes | Revoke the current session |
+| `/api/auth/me` | GET | No (returns `user: null` if signed out) | Who the current session belongs to |
+| `/api/ask` | POST | **Yes** | The RAG endpoint — question in, grounded answer out |
+| `/api/upload` | POST | **Yes** | Save + ingest documents in one request |
+| `/api/my/documents` | GET | Yes | Documents *you* uploaded, with live chunk counts |
+| `/api/admin/users` | GET | Yes (admin) | List every account |
+| `/api/admin/users/{id}` | DELETE | Yes (admin) | Delete a user (their sessions end immediately) |
+| `/api/admin/documents` | GET | Yes (admin) | Every uploaded document, any owner |
+| `/api/admin/documents/{source}` | DELETE | Yes (admin) | Remove a document's file and chunks together |
+
+`/api/ask` and `/api/upload` require a signed-in session — the browser holds
+this as an `HttpOnly` cookie automatically, but a script has to log in first
+and reuse the cookie on every subsequent call:
+
 ```bash
+# 1. Health check — no auth needed
 curl http://localhost:8001/api/health
 
-curl -X POST http://localhost:8001/api/ask \
+# 2. Sign in and save the session cookie to a jar file
+curl -c cookies.txt -X POST http://localhost:8001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"username\": \"Shailendra.KS\", \"password\": \"<ADMIN_PASSWORD>\"}"
+
+# 3. Ask a question, sending the cookie back
+curl -b cookies.txt -X POST http://localhost:8001/api/ask \
   -H "Content-Type: application/json" \
   -d "{\"question\": \"How do I configure connection pooling?\"}"
 
-# upload documents — saved to data/ AND ingested in the same request
-curl -X POST http://localhost:8001/api/upload \
-  -F "files=@notes.md" -F "files=@spec.pdf"
+# 4. Upload documents — saved to data/ AND ingested in the same request
+curl -b cookies.txt -X POST http://localhost:8001/api/upload \
+  -F "files=@notes.md" -F "files=@spec.pdf" -F "purpose=Reference notes"
 ```
+
+Calling `/api/ask` or `/api/upload` without a valid cookie returns
+`401 {"detail": "Please sign in to continue."}` — see
+[Troubleshooting](#401-please-sign-in-to-continue).
 
 ---
 
@@ -712,6 +782,46 @@ Work through this in order:
 3. **Right chunks, weak answer?** Set `OPENAI_MODEL=gpt-4o`.
 4. **DevBrain refuses although the answer is in your notes?** Set
    `RETRIEVER_SCORE_THRESHOLD=0.0` and raise `RETRIEVER_K`.
+
+### `401 Please sign in to continue`
+
+`/api/ask` and `/api/upload` require an active session. In the browser this
+means you were signed out (sessions expire after 12 hours, or you clicked
+**Sign out**) — sign in again. When scripting against the API, you skipped
+the login step; see the curl example in
+[Command reference](#api-useful-for-scripting).
+
+### `403 Administrator access is required`
+
+You are signed in, but as a standard user calling an admin-only endpoint
+(`/api/admin/*`). Sign in with the administrator account instead.
+
+### I forgot the administrator password
+
+Set a **new** `ADMIN_PASSWORD` in your environment and restart the server —
+but note that seeding only ever *creates*, so this does nothing if the admin
+account already exists (§2, Part 2). To reset an existing admin's password,
+either update it from inside the app while still signed in, or open pgAdmin
+(Part 6) and update the row directly:
+
+```sql
+-- Generate a new bcrypt hash for "NewPassword123" with Python first:
+--   python -c "import bcrypt,hashlib; print(bcrypt.hashpw(hashlib.sha256(b'NewPassword123').hexdigest().encode(), bcrypt.gensalt(12)).decode())"
+UPDATE devbrain_users
+SET password_hash = '<paste the generated hash>'
+WHERE username = 'Shailendra.KS';
+```
+
+### How do I make another user an administrator?
+
+There is no promote-to-admin button by design — `POST /api/auth/register`
+always creates a standard user, so nobody can register their way to admin
+(§2, §4.4). To grant admin rights to an existing account, run this once in
+pgAdmin's Query Tool (Part 6):
+
+```sql
+UPDATE devbrain_users SET is_admin = true WHERE username = 'their-username';
+```
 
 ### `ModuleNotFoundError: No module named 'fastapi'`
 
@@ -942,9 +1052,12 @@ docker compose --profile full run --rm app python ingest.py
 
 #### Step C.6 — Put HTTPS in front
 
-Never expose port 8001 directly. DevBrain speaks plain HTTP and has **no
-authentication** — anyone who reaches it can read your entire knowledge base and
-spend your OpenAI credit.
+Never expose port 8001 directly. DevBrain **does** authenticate users
+(bcrypt-hashed passwords, server-side sessions, admin vs. standard roles —
+see the Architecture doc §13) — what it does **not** do on its own is
+encrypt the connection. Signing in over plain HTTP sends the password and
+session cookie unencrypted, so anyone on the network path between the
+browser and the server can read them.
 
 Bind the app to loopback in `.env`:
 
@@ -958,14 +1071,14 @@ Then terminate TLS with nginx or Caddy. Caddy is the shortest path — this
 ```
 devbrain.example.com {
     reverse_proxy 127.0.0.1:8001
-    basicauth {
-        yourname <bcrypt hash from: caddy hash-password>
-    }
 }
 ```
 
-That `basicauth` block is the minimum viable access control. For real
-multi-user access you would add proper authentication to the application.
+Once traffic reaches the app over HTTPS, set the session cookie's `secure`
+flag so it is only ever sent over an encrypted connection — in `app.py`,
+change `secure=False` to `secure=True` in `_set_session_cookie()`. DevBrain's
+own accounts (Part 4.4) are then the real access control; a reverse-proxy
+`basicauth` block is optional extra hardening, not a substitute for it.
 
 #### Step C.7 — Back up
 
@@ -1014,16 +1127,20 @@ Work through this before letting anyone else reach the service.
 | ☐ | `.env` is `chmod 600` and not in git | It holds three API keys |
 | ☐ | Postgres bound to `127.0.0.1:5433` | Never expose a database to the internet |
 | ☐ | pgAdmin bound to `127.0.0.1:5051`, or not deployed at all | It is an admin console |
-| ☐ | HTTPS terminated by a reverse proxy | The app speaks plain HTTP |
-| ☐ | Some form of authentication in front | DevBrain has none of its own |
+| ☐ | HTTPS terminated by a reverse proxy | The app speaks plain HTTP; without TLS, passwords and session cookies travel unencrypted |
+| ☐ | `secure=True` set on the session cookie (`app.py`, once HTTPS is live) | Otherwise the cookie can still be sent over an accidental plain-HTTP request |
+| ☐ | `ADMIN_PASSWORD` changed from the shipped/default value | The default is meant for local development only |
+| ☐ | Self-registration reviewed — anyone who reaches the URL can create a standard account | By design (§2); put the proxy in front of registration too if that is unwanted |
 | ☐ | Automated `pg_dump` backups, and a tested restore | An untested backup is not a backup |
-| ☐ | Spending limits set on the OpenAI and Cohere dashboards | Caps the damage if the URL leaks |
+| ☐ | Spending limits set on the OpenAI and Cohere dashboards | Caps the damage if credentials or the URL leak |
 | ☐ | `docker compose --profile full logs` checked after deploy | Catches config errors immediately |
 | ☐ | `LANGSMITH_PROJECT` differs from your dev project | Keeps prod traces clean |
 
-> **The single most important line:** DevBrain ships with **no authentication**.
-> It is designed for `localhost`. The moment it is reachable from a network, put
-> a proxy with access control in front of it.
+> **The single most important line:** DevBrain authenticates every user
+> (Part 4.4) but ships **without transport encryption** — it is designed to be
+> reached over `localhost` or a trusted network. The moment it is reachable
+> from the open internet, put HTTPS in front of it (Step C.6) so credentials
+> and session cookies are never sent in the clear.
 
 ---
 
@@ -1085,11 +1202,24 @@ Every setting, and what it should be in each environment.
 
 | Setting | Default | Effect |
 |---|---|---|
-| `DATA_DIR` | `data` | `/app/data` inside the container (mounted read-only) |
+| `DATA_DIR` | `data` | `/app/data` inside the container (mounted read-write for uploads) |
 | `CHUNK_SIZE` | `1000` | Smaller = sharper retrieval, less context. Needs `--reset` |
 | `CHUNK_OVERLAP` | `150` | Stops ideas being orphaned at a chunk boundary. Needs `--reset` |
 | `RETRIEVER_K` | `4` | Chunks fed to the LLM per question |
 | `RETRIEVER_SCORE_THRESHOLD` | `0.0` | `0.3` filters weak matches; `0.0` keeps everything |
+
+### Administrator account
+
+| Setting | Development | Server | Notes |
+|---|---|---|---|
+| `ADMIN_USERNAME` | `Shailendra.KS` (or your choice) | your choice | Seeded on first request only — never overwritten on restart |
+| `ADMIN_PASSWORD` | your choice | **generated / unique** | Change from any shared default before deploying |
+| `ADMIN_FULL_NAME` | optional | optional | Shown in the UI header and **Manage users** |
+| `ADMIN_EMAIL` | optional | optional | Shown in **Manage users** only |
+
+There is no `SESSION_TTL_HOURS` environment variable — session length is
+fixed at **12 hours** in `auth.py`. After that, or after **Sign out**, signing
+in again is required.
 
 ---
 

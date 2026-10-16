@@ -1,5 +1,7 @@
 # Chapter 12 — The FastAPI Application
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 12.1 What the web layer adds

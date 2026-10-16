@@ -1,5 +1,7 @@
 # Appendix D — Troubleshooting Index
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 Find your symptom. Each entry gives the cause, the fix, and the chapter that
 explains why.
 

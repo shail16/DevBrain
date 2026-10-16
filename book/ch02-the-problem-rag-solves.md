@@ -1,5 +1,7 @@
 # Chapter 2 — The Problem RAG Solves
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 2.1 What a language model actually knows

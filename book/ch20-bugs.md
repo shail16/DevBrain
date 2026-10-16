@@ -1,5 +1,7 @@
 # Chapter 20 — Bugs We Hit, and What They Taught
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 20.1 Why this chapter exists

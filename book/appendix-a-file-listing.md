@@ -1,5 +1,7 @@
 # Appendix A — Complete File Listing
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 A map of every file, what it does, and which chapter builds it.
 
 ---

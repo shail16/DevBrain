@@ -1,5 +1,7 @@
 # Chapter 13 — The Frontend
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 13.1 A deliberate constraint

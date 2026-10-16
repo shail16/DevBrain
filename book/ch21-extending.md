@@ -1,5 +1,7 @@
 # Chapter 21 — Extending DevBrain
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 21.1 Where the design deliberately stops

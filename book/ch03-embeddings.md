@@ -1,5 +1,7 @@
 # Chapter 3 — Embeddings: Turning Meaning Into Numbers
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 3.1 The problem with keyword search

@@ -1,5 +1,7 @@
 # DevBrain
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 A private, local AI knowledge base over your own engineering documents.
 
 Drop notes, runbooks, specs and spreadsheets into `data/` — or upload them

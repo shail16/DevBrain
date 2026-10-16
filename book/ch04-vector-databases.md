@@ -1,5 +1,7 @@
 # Chapter 4 — Vector Databases and pgvector
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 4.1 The problem

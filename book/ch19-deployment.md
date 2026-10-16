@@ -1,5 +1,7 @@
 # Chapter 19 — Deployment and Hardening
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 19.1 The one thing to understand first

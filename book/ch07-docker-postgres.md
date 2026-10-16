@@ -1,5 +1,7 @@
 # Chapter 7 — Docker: PostgreSQL and pgAdmin
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 7.1 Why Docker

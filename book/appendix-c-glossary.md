@@ -1,5 +1,7 @@
 # Appendix C — Glossary
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 Terms as they are used in this book, with the chapter that introduces each.
 
 ---

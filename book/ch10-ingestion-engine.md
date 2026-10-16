@@ -1,5 +1,7 @@
 # Chapter 10 — The Ingestion Engine
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 10.1 What ingestion does

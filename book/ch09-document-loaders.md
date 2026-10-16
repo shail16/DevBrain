@@ -1,5 +1,7 @@
 # Chapter 9 — Document Loaders
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 9.1 The job

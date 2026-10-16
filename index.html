@@ -858,9 +858,9 @@
             <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
           </div>
           <div class="drop-title">Drag files here, or <button type="button" class="link-btn" id="browse-btn">browse</button></div>
-          <div class="drop-sub">PDF, Word, Excel, Markdown or plain text &middot; up to 25 MB each</div>
+          <div class="drop-sub">PDF, Word, Excel, HTML, images (JPG, PNG, GIF), Markdown or plain text &middot; up to 25 MB each</div>
           <input type="file" id="file-input" multiple hidden
-                 accept=".pdf,.docx,.txt,.md,.markdown,.log,.csv,.xlsx,.xlsm" />
+                 accept=".pdf,.docx,.txt,.md,.markdown,.log,.csv,.xlsx,.xlsm,.html,.htm,.jpg,.jpeg,.png,.gif" />
         </div>
 
         <div class="queue" id="upload-queue" hidden></div>
@@ -1288,7 +1288,7 @@ const up = {
   result:      document.getElementById("upload-result"),
 };
 
-const ALLOWED = [".pdf", ".docx", ".txt", ".md", ".markdown", ".log", ".csv", ".xlsx", ".xlsm"];
+const ALLOWED = [".pdf", ".docx", ".txt", ".md", ".markdown", ".log", ".csv", ".xlsx", ".xlsm", ".html", ".htm", ".jpg", ".jpeg", ".png", ".gif"];
 const MAX_BYTES = 25 * 1024 * 1024;
 
 let queued = [];

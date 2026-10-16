@@ -1,5 +1,7 @@
 # Chapter 8 — Configuration and Secrets
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 8.1 The problem

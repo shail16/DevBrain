@@ -1,5 +1,7 @@
 # Chapter 5 — Chunking: Why We Cut Documents Up
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 5.1 Why not embed the whole document?

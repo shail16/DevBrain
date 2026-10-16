@@ -1,5 +1,7 @@
 # Chapter 16 — File Upload and Live Ingestion
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 16.1 The goal

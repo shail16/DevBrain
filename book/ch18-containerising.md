@@ -1,5 +1,7 @@
 # Chapter 18 — Containerising the Application
 
+*© 2026 Shailendra Srivastava. All rights reserved.*
+
 ---
 
 ## 18.1 Two topologies, one codebase
