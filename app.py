@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import threading
 import time
 from contextlib import asynccontextmanager
 from dataclasses import replace
@@ -534,6 +535,9 @@ def whoami(request: Request) -> JSONResponse:
     return JSONResponse(content={"user": user.as_dict() if user else None})
 
 
+_AUTH_SETUP_LOCK = threading.Lock()
+
+
 def _ensure_auth_ready(settings: Settings) -> None:
     """
     Create the auth tables and seed the administrator, once per process.
@@ -543,11 +547,17 @@ def _ensure_auth_ready(settings: Settings) -> None:
     """
     if getattr(app.state, "auth_ready", False):
         return
-    auth.init_schema(settings)
-    created = auth.ensure_admin(settings)
-    if created:
-        logger.info("seeded administrator account: %s", created)
-    app.state.auth_ready = True
+    # The page fires several requests at once on first load. Without a lock they
+    # all run CREATE TABLE concurrently, block each other, and exhaust the
+    # connection pool. Only one does the setup; the rest wait, then see it done.
+    with _AUTH_SETUP_LOCK:
+        if getattr(app.state, "auth_ready", False):
+            return
+        auth.init_schema(settings)
+        created = auth.ensure_admin(settings)
+        if created:
+            logger.info("seeded administrator account: %s", created)
+        app.state.auth_ready = True
 
 
 # --------------------------------------------------------------------------- #
